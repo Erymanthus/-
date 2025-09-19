@@ -36,7 +36,7 @@
 - UI improvements
 
 # BETA 0.0.2
-- Added a daily streak system for collecting stars.
+- Added a daily streak system for collecting stars
 
 
 
