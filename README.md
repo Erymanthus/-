@@ -18,6 +18,6 @@ A simple and fun mod that tracks your daily activity streak and rewards your con
 - Earn stars for daily progress
 - Unlockable badges for milestone achievements
 - Animated badge unlocks in the progress popup
-- Visual progress bar and detailed stats
+- Visual progress bar and detailed stats.
 
 
