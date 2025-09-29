@@ -1352,19 +1352,510 @@ public:
      std::vector<GenericPrizeResult> m_multiSpinResults;
      std::vector<StreakData::BadgeInfo> m_pendingMythics;
 
-     // --- Declaración de todas las funciones ---
-     bool setup() override;
-     void update(float dt) override;
-     void onSpin(CCObject*);
-     void onSpinMultiple(CCObject*);
-     void onMultiSpinEnd();
-     void processMythicQueue();
-     void playTickSound();
-     void onSpinEnd();
-     void updateAllCheckmarks();
-     void flashWinningSlot(CCObject* pSender);
-     void onOpenShop(CCObject*);
-     void onShowProbabilities(CCObject*); // <-- Nueva función
+     // Funciones auxiliares para reemplazar CCTargetedAction
+     void runPopAnimation(CCObject* sender) {
+         if (auto node = dynamic_cast<CCNode*>(sender)) {
+             auto popAction = CCSequence::create(
+                 CCScaleTo::create(0.025f, 1.1f),
+                 CCScaleTo::create(0.025f, 1.0f),
+                 nullptr
+             );
+             node->runAction(popAction);
+         }
+     }
+
+     void runSlotAnimation(CCObject* sender) {
+         if (auto node = dynamic_cast<CCNode*>(sender)) {
+             auto popAction = CCSequence::create(
+                 CCScaleTo::create(0.02f, 1.1f),
+                 CCScaleTo::create(0.02f, 1.0f),
+                 nullptr
+             );
+             node->runAction(popAction);
+         }
+     }
+
+     bool setup() override {
+         this->setTitle("Roulette");
+         auto winSize = m_mainLayer->getContentSize();
+         g_streakData.load();
+         m_currentSelectorIndex = g_streakData.lastRouletteIndex;
+         m_mythicColors = {
+             ccc3(255, 0, 0), ccc3(255, 165, 0), ccc3(255, 255, 0), ccc3(0, 255, 0),
+             ccc3(0, 0, 255), ccc3(75, 0, 130), ccc3(238, 130, 238)
+         };
+         m_currentColor = m_mythicColors[0];
+         m_targetColor = m_mythicColors[1];
+         m_rouletteNode = CCNode::create();
+         m_rouletteNode->setPosition({ winSize.width / 2, winSize.height / 2 + 10.f });
+         m_mainLayer->addChild(m_rouletteNode);
+         m_roulettePrizes = {
+             { RewardType::Badge, "super_star_badge", 1, "", "First Mythic", 1, StreakData::BadgeCategory::MYTHIC },
+             { RewardType::Badge, "gold_streak_badge", 1, "", "Gold Legend's", 3, StreakData::BadgeCategory::LEGENDARY },
+             { RewardType::Badge, "dark_streak_badge", 1, "", "dark side", 5, StreakData::BadgeCategory::EPIC },
+             { RewardType::Badge, "ncs_badge", 1, "", "NCS lover", 10, StreakData::BadgeCategory::SPECIAL },
+             { RewardType::Badge, "beta_badge", 1, "", "Player beta?", 70, StreakData::BadgeCategory::COMMON },
+             { RewardType::Badge, "platino_streak_badge", 1, "", "platino badge", 70, StreakData::BadgeCategory::COMMON },
+             { RewardType::StarTicket, "star_tiket_1", 1, "star_tiket.png"_spr, "1 star tiket", 70, StreakData::BadgeCategory::COMMON },
+             { RewardType::StarTicket, "star_tiket_3", 3, "star_tiket.png"_spr, "3 star tiket", 70, StreakData::BadgeCategory::COMMON },
+             { RewardType::StarTicket, "star_ticket_15", 15, "star_tiket.png"_spr, "15 Tickets", 70, StreakData::BadgeCategory::COMMON },
+             { RewardType::StarTicket, "star_ticket_30", 30, "star_tiket.png"_spr, "30 Tickets", 10, StreakData::BadgeCategory::SPECIAL },
+             { RewardType::StarTicket, "star_ticket_60", 60, "star_tiket.png"_spr, "60 Tickets", 5, StreakData::BadgeCategory::EPIC },
+             { RewardType::StarTicket, "star_ticket_100", 100, "star_tiket.png"_spr, "100 Tickets", 3, StreakData::BadgeCategory::LEGENDARY }
+         };
+
+         const int gridSize = 4;
+         m_slotSize = 38.f;
+         const float spacing = 5.f;
+         const float totalSize = (gridSize * m_slotSize) + ((gridSize - 1) * spacing);
+         const float startPos = -totalSize / 2.f + m_slotSize / 2.f;
+         std::vector<CCPoint> slotPositions;
+         for (int i = 0; i < gridSize; ++i) slotPositions.push_back({ startPos + i * (m_slotSize + spacing), startPos + (gridSize - 1) * (m_slotSize + spacing) });
+         for (int i = gridSize - 2; i > 0; --i) slotPositions.push_back({ startPos + (gridSize - 1) * (m_slotSize + spacing), startPos + i * (m_slotSize + spacing) });
+         for (int i = gridSize - 1; i >= 0; --i) slotPositions.push_back({ startPos + i * (m_slotSize + spacing), startPos });
+         for (int i = 1; i < gridSize - 1; ++i) slotPositions.push_back({ startPos, startPos + i * (m_slotSize + spacing) });
+         for (size_t i = 0; i < slotPositions.size(); ++i) {
+             if (i >= m_roulettePrizes.size()) continue;
+             auto& currentPrize = m_roulettePrizes[i];
+             auto slotContainer = CCNode::create();
+             slotContainer->setPosition(slotPositions[i]);
+             m_rouletteNode->addChild(slotContainer);
+             m_orderedSlots.push_back(slotContainer);
+             auto slotBG = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
+             slotBG->setContentSize({ m_slotSize, m_slotSize });
+             slotBG->setColor({ 0, 0, 0 });
+             slotBG->setOpacity(150);
+             slotContainer->addChild(slotBG);
+             auto qualitySprite = CCSprite::create(getQualitySpriteName(currentPrize.category).c_str());
+             qualitySprite->setScale((m_slotSize - 4.f) / qualitySprite->getContentSize().width);
+             slotContainer->addChild(qualitySprite, 1);
+             if (currentPrize.category == StreakData::BadgeCategory::MYTHIC) m_mythicSprites.push_back(qualitySprite);
+             if (currentPrize.type == RewardType::Badge) {
+                 auto* badgeInfo = g_streakData.getBadgeInfo(currentPrize.id);
+                 if (badgeInfo) {
+                     auto rewardIcon = CCSprite::create(badgeInfo->spriteName.c_str());
+                     rewardIcon->setScale(0.15f);
+                     slotContainer->addChild(rewardIcon, 2);
+                     if (g_streakData.isBadgeUnlocked(badgeInfo->badgeID)) {
+                         auto claimedIcon = CCSprite::createWithSpriteFrameName("GJ_completesIcon_001.png");
+                         claimedIcon->setScale(0.5f);
+                         claimedIcon->setPosition({ m_slotSize / 2 - 5, -m_slotSize / 2 + 5 });
+                         claimedIcon->setTag(199);
+                         slotContainer->addChild(claimedIcon, 3);
+                     }
+                 }
+             }
+             else {
+                 auto rewardIcon = CCSprite::create(currentPrize.spriteName.c_str());
+                 rewardIcon->setScale(0.2f);
+                 slotContainer->addChild(rewardIcon, 2);
+                 auto quantityLabel = CCLabelBMFont::create(CCString::createWithFormat("x%d", currentPrize.quantity)->getCString(), "goldFont.fnt");
+                 quantityLabel->setScale(0.3f);
+                 quantityLabel->setPosition(0, -m_slotSize / 2 + 5);
+                 slotContainer->addChild(quantityLabel, 3);
+             }
+         }
+         m_selectorSprite = CCSprite::create("casilla_selector.png"_spr);
+         m_selectorSprite->setScale(m_slotSize / m_selectorSprite->getContentSize().width);
+         if (!m_orderedSlots.empty()) m_selectorSprite->setPosition(m_orderedSlots[m_currentSelectorIndex]->getPosition());
+         m_rouletteNode->addChild(m_selectorSprite, 4);
+
+         // Botones y contadores
+         m_spinBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Spin"), this, menu_selector(RoulettePopup::onSpin));
+         m_spin10Btn = CCMenuItemSpriteExtra::create(ButtonSprite::create("x10"), this, menu_selector(RoulettePopup::onSpinMultiple));
+         auto spinMenu = CCMenu::create();
+         spinMenu->addChild(m_spinBtn);
+         spinMenu->addChild(m_spin10Btn);
+         spinMenu->alignItemsHorizontallyWithPadding(10.f);
+         spinMenu->setPosition({ winSize.width / 2, 30.f });
+         m_mainLayer->addChild(spinMenu);
+
+         auto shopSprite = CCSprite::create("shop_btn.png"_spr);
+         shopSprite->setScale(0.7f);
+         auto shopBtn = CCMenuItemSpriteExtra::create(shopSprite, this, menu_selector(RoulettePopup::onOpenShop));
+         auto shopMenu = CCMenu::createWithItem(shopBtn);
+         shopMenu->setPosition({ winSize.width - 35.f, 30.f });
+         m_mainLayer->addChild(shopMenu);
+
+         auto superStarCounterNode = CCNode::create();
+         auto haveAmountLabel = CCLabelBMFont::create(std::to_string(g_streakData.superStars).c_str(), "goldFont.fnt");
+         haveAmountLabel->setScale(0.4f);
+         haveAmountLabel->setAnchorPoint({ 1.f, 0.5f });
+         haveAmountLabel->setID("roulette-super-star-label");
+         superStarCounterNode->addChild(haveAmountLabel);
+         auto haveStar = CCSprite::create("super_star.png"_spr);
+         haveStar->setScale(0.12f);
+         superStarCounterNode->addChild(haveStar);
+         haveAmountLabel->setPosition({ -haveStar->getScaledContentSize().width / 2 - 2, 0 });
+         haveStar->setPosition({ haveAmountLabel->getScaledContentSize().width / 2, 0 });
+         superStarCounterNode->setPosition({ winSize.width - 35.f, winSize.height - 25.f });
+         m_mainLayer->addChild(superStarCounterNode);
+
+         auto infoIcon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png");
+         infoIcon->setScale(0.8f);
+         auto infoBtn = CCMenuItemSpriteExtra::create(infoIcon, this, menu_selector(RoulettePopup::onShowProbabilities));
+         auto infoMenu = CCMenu::createWithItem(infoBtn);
+         infoMenu->setPosition({ 25.f, winSize.height - 25.f });
+         m_mainLayer->addChild(infoMenu);
+
+         this->scheduleUpdate();
+         return true;
+     }
+
+     void update(float dt) override {
+         if (m_mythicSprites.empty()) return;
+         m_colorTransitionTime += dt;
+         float transitionDuration = 1.0f;
+         if (m_colorTransitionTime >= transitionDuration) {
+             m_colorTransitionTime = 0.0f;
+             m_colorIndex = (m_colorIndex + 1) % m_mythicColors.size();
+             m_currentColor = m_targetColor;
+             m_targetColor = m_mythicColors[(m_colorIndex + 1) % m_mythicColors.size()];
+         }
+         float progress = m_colorTransitionTime / transitionDuration;
+         ccColor3B interpolatedColor = {
+             static_cast<GLubyte>(m_currentColor.r + (m_targetColor.r - m_currentColor.r) * progress),
+             static_cast<GLubyte>(m_currentColor.g + (m_targetColor.g - m_currentColor.g) * progress),
+             static_cast<GLubyte>(m_currentColor.b + (m_targetColor.b - m_currentColor.b) * progress)
+         };
+         for (auto* sprite : m_mythicSprites) sprite->setColor(interpolatedColor);
+     }
+
+     void onSpin(CCObject*) {
+         g_streakData.load();
+         if (g_streakData.superStars < 1) {
+             FLAlertLayer::create("Not Enough Super Stars", "You need at least <cy>1 Super Star</c> to spin.", "OK")->show();
+             return;
+         }
+         if (m_isSpinning) return;
+         m_isSpinning = true;
+         m_spinBtn->setEnabled(false);
+         m_spin10Btn->setEnabled(false);
+         g_streakData.superStars -= 1;
+         g_streakData.totalSpins += 1;
+         g_streakData.save();
+         auto starCountLabel = static_cast<CCLabelBMFont*>(m_mainLayer->getChildByIDRecursive("roulette-super-star-label"));
+         if (starCountLabel) starCountLabel->setString(std::to_string(g_streakData.superStars).c_str());
+         auto spinCountLabel = static_cast<CCLabelBMFont*>(m_mainLayer->getChildByIDRecursive("roulette-spin-count-label"));
+         if (spinCountLabel) spinCountLabel->setString(CCString::createWithFormat("Spins: %d", g_streakData.totalSpins)->getCString());
+         int totalWeight = 0;
+         for (const auto& prize : m_roulettePrizes) totalWeight += prize.probabilityWeight;
+         int randomValue = rand() % totalWeight;
+         int winningIndex = 0;
+         for (size_t i = 0; i < m_roulettePrizes.size(); ++i) {
+             if (randomValue < m_roulettePrizes[i].probabilityWeight) {
+                 winningIndex = i;
+                 break;
+             }
+             randomValue -= m_roulettePrizes[i].probabilityWeight;
+         }
+         int totalSlots = m_orderedSlots.size();
+         int laps = 5;
+         int distance = (winningIndex - m_currentSelectorIndex + totalSlots) % totalSlots;
+         m_totalSteps = (laps * totalSlots) + distance;
+         auto actions = CCArray::create();
+         for (int i = 1; i <= m_totalSteps; ++i) {
+             int stepIndex = (m_currentSelectorIndex + i) % totalSlots;
+             auto targetSlot = m_orderedSlots[stepIndex];
+             float duration = 0.05f;
+             if (i < 5) duration = 0.2f - (i * 0.03f);
+             else if (i > m_totalSteps - 10) duration = 0.05f + ((i - (m_totalSteps - 10)) * 0.04f);
+             auto moveAction = CCEaseSineInOut::create(CCMoveTo::create(duration, targetSlot->getPosition()));
+             auto soundAction = CCCallFunc::create(this, callfunc_selector(RoulettePopup::playTickSound));
+             auto slotCall = CCCallFuncO::create(this, callfuncO_selector(RoulettePopup::runPopAnimation), targetSlot);
+             actions->addObject(CCSpawn::create(moveAction, soundAction, slotCall, nullptr));
+         }
+         actions->addObject(CCCallFunc::create(this, callfunc_selector(RoulettePopup::onSpinEnd)));
+         m_selectorSprite->runAction(CCSequence::create(actions));
+     }
+
+     void onSpinMultiple(CCObject*) {
+         g_streakData.load();
+         if (g_streakData.superStars < 10) {
+             FLAlertLayer::create("Not Enough Super Stars", "You need at least <cy>10 Super Stars</c> to spin x10.", "OK")->show();
+             return;
+         }
+         if (m_isSpinning) return;
+         m_isSpinning = true;
+         m_spinBtn->setEnabled(false);
+         m_spin10Btn->setEnabled(false);
+         g_streakData.superStars -= 10;
+         g_streakData.totalSpins += 10;
+         std::vector<GenericPrizeResult> allPrizes;
+         int totalTicketsWon = 0;
+         m_pendingMythics.clear();
+         std::vector<int> winningIndices;
+         int totalWeight = 0;
+         for (const auto& prize : m_roulettePrizes) totalWeight += prize.probabilityWeight;
+         for (int i = 0; i < 10; ++i) {
+             int randomValue = rand() % totalWeight;
+             int winningIndex = 0;
+             for (size_t j = 0; j < m_roulettePrizes.size(); ++j) {
+                 if (randomValue < m_roulettePrizes[j].probabilityWeight) {
+                     winningIndex = j;
+                     break;
+                 }
+                 randomValue -= m_roulettePrizes[j].probabilityWeight;
+             }
+             winningIndices.push_back(winningIndex);
+             auto& prize = m_roulettePrizes[winningIndex];
+             GenericPrizeResult result;
+             result.type = prize.type;
+             result.id = prize.id;
+             result.quantity = prize.quantity;
+             result.displayName = prize.displayName;
+             result.category = prize.category;
+             switch (prize.type) {
+             case RewardType::Badge: {
+                 auto* badgeInfo = g_streakData.getBadgeInfo(prize.id);
+                 if (badgeInfo) {
+                     result.spriteName = badgeInfo->spriteName;
+                     result.isNew = !g_streakData.isBadgeUnlocked(prize.id);
+                     if (result.isNew) {
+                         g_streakData.unlockBadge(prize.id);
+                         if (badgeInfo->category == StreakData::BadgeCategory::MYTHIC) {
+                             m_pendingMythics.push_back(*badgeInfo);
+                         }
+                     }
+                     else {
+                         int tickets = g_streakData.getTicketValueForRarity(badgeInfo->category);
+                         g_streakData.starTickets += tickets;
+                         totalTicketsWon += tickets;
+                         result.ticketsFromDuplicate = tickets;
+                     }
+                 }
+                 break;
+             }
+             case RewardType::SuperStar: {
+                 g_streakData.superStars += prize.quantity;
+                 result.spriteName = prize.spriteName;
+                 break;
+             }
+             case RewardType::StarTicket: {
+                 g_streakData.starTickets += prize.quantity;
+                 totalTicketsWon += prize.quantity;
+                 result.spriteName = prize.spriteName;
+                 break;
+             }
+             }
+             allPrizes.push_back(result);
+         }
+         m_multiSpinResults = allPrizes;
+         g_streakData.save();
+         if (auto starCountLabel = static_cast<CCLabelBMFont*>(m_mainLayer->getChildByIDRecursive("roulette-super-star-label"))) {
+             starCountLabel->setString(std::to_string(g_streakData.superStars).c_str());
+         }
+         if (auto spinCountLabel = static_cast<CCLabelBMFont*>(m_mainLayer->getChildByIDRecursive("roulette-spin-count-label"))) {
+             spinCountLabel->setString(CCString::createWithFormat("Spins: %d", g_streakData.totalSpins)->getCString());
+         }
+         auto actions = CCArray::create();
+         int totalSlots = m_orderedSlots.size();
+         int lastIndex = m_currentSelectorIndex;
+         for (int prizeIndex : winningIndices) {
+             int distance = (prizeIndex - lastIndex + totalSlots) % totalSlots;
+             if (distance == 0) distance = totalSlots;
+             for (int i = 1; i <= distance; ++i) {
+                 int stepIndex = (lastIndex + i) % totalSlots;
+                 auto targetSlot = m_orderedSlots[stepIndex];
+                 float moveDuration = 0.04f;
+                 auto moveAction = CCMoveTo::create(moveDuration, targetSlot->getPosition());
+                 auto soundAction = CCCallFunc::create(this, callfunc_selector(RoulettePopup::playTickSound));
+                 auto slotCall = CCCallFuncO::create(this, callfuncO_selector(RoulettePopup::runSlotAnimation), targetSlot);
+                 actions->addObject(CCSpawn::create(moveAction, soundAction, slotCall, nullptr));
+             }
+             actions->addObject(CCDelayTime::create(0.25f));
+             actions->addObject(CCCallFuncO::create(this, callfuncO_selector(RoulettePopup::flashWinningSlot), CCInteger::create(prizeIndex)));
+             lastIndex = prizeIndex;
+         }
+         m_currentSelectorIndex = lastIndex;
+         actions->addObject(CCCallFunc::create(this, callfunc_selector(RoulettePopup::onMultiSpinEnd)));
+         m_selectorSprite->runAction(CCSequence::create(actions));
+     }
+
+     void flashWinningSlot(CCObject* pSender) {
+         int slotIndex = static_cast<CCInteger*>(pSender)->getValue();
+         if (static_cast<size_t>(slotIndex) >= m_orderedSlots.size()) return;
+         auto targetSlot = m_orderedSlots[slotIndex];
+         auto glow = CCSprite::create("cuadro.png"_spr);
+         if (!glow) return;
+         glow->setPosition(targetSlot->getContentSize() / 2);
+         glow->setScale(m_slotSize / glow->getContentSize().width);
+         glow->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
+         glow->setColor({ 255, 255, 150 });
+         glow->setOpacity(0);
+         glow->runAction(CCSequence::create(
+             CCFadeTo::create(0.2f, 200),
+             CCFadeTo::create(0.3f, 0),
+             CCRemoveSelf::create(),
+             nullptr
+         ));
+         targetSlot->addChild(glow, 5);
+     }
+
+     void processMythicQueue() {
+         if (!m_pendingMythics.empty()) {
+             auto mythicBadge = m_pendingMythics.front();
+             m_pendingMythics.erase(m_pendingMythics.begin());
+             auto animLayer = MythicAnimationLayer::create(mythicBadge, [this]() {
+                 this->processMythicQueue();
+                 });
+             CCDirector::sharedDirector()->getRunningScene()->addChild(animLayer, 400);
+         }
+         else {
+             MultiPrizePopup::create(m_multiSpinResults, [this]() {
+                 if (m_spinBtn && m_spin10Btn) {
+                     m_spinBtn->setEnabled(true);
+                     m_spin10Btn->setEnabled(true);
+                 }
+                 })->show();
+         }
+     }
+
+     void onMultiSpinEnd() {
+         m_isSpinning = false;
+         updateAllCheckmarks();
+         g_streakData.lastRouletteIndex = m_currentSelectorIndex;
+         g_streakData.save();
+         m_pendingMythics.clear();
+         int totalTicketsWonInSpin = 0;
+         for (const auto& result : m_multiSpinResults) {
+             if (result.isNew && result.type == RewardType::Badge && result.category == StreakData::BadgeCategory::MYTHIC) {
+                 auto* badgeInfo = g_streakData.getBadgeInfo(result.id);
+                 if (badgeInfo) {
+                     m_pendingMythics.push_back(*badgeInfo);
+                 }
+             }
+             if (result.type == RewardType::StarTicket) {
+                 totalTicketsWonInSpin += result.quantity;
+             }
+             else if (result.type == RewardType::Badge && !result.isNew) {
+                 totalTicketsWonInSpin += result.ticketsFromDuplicate;
+             }
+         }
+         if (!m_pendingMythics.empty()) {
+             processMythicQueue();
+         }
+         else {
+             MultiPrizePopup::create(m_multiSpinResults, [this, totalTicketsWonInSpin]() {
+                 m_spinBtn->setEnabled(true);
+                 m_spin10Btn->setEnabled(true);
+                 if (totalTicketsWonInSpin > 0) {
+                     CCDirector::sharedDirector()->getRunningScene()->addChild(TicketAnimationLayer::create(totalTicketsWonInSpin), 1000);
+                 }
+                 })->show();
+         }
+     }
+
+     void updateAllCheckmarks() {
+         for (size_t i = 0; i < m_orderedSlots.size(); ++i) {
+             if (i >= m_roulettePrizes.size()) continue;
+             auto& prize = m_roulettePrizes[i];
+             if (prize.type != RewardType::Badge) continue;
+             auto slotNode = m_orderedSlots[i];
+             if (g_streakData.isBadgeUnlocked(prize.id) && !slotNode->getChildByTag(199)) {
+                 auto claimedIcon = CCSprite::createWithSpriteFrameName("GJ_completesIcon_001.png");
+                 claimedIcon->setScale(0.5f);
+                 claimedIcon->setPosition({ m_slotSize / 2 - 5, -m_slotSize / 2 + 5 });
+                 claimedIcon->setTag(199);
+                 slotNode->addChild(claimedIcon, 3);
+             }
+         }
+     }
+
+     void playTickSound() {
+         FMODAudioEngine::sharedEngine()->playEffect("ruleta_sfx.mp3"_spr);
+     }
+
+     void onSpinEnd() {
+         m_isSpinning = false;
+         m_spinBtn->setEnabled(true);
+         m_spin10Btn->setEnabled(true);
+         int winningIndex = (m_currentSelectorIndex + m_totalSteps) % m_orderedSlots.size();
+         m_currentSelectorIndex = winningIndex;
+         g_streakData.lastRouletteIndex = m_currentSelectorIndex;
+         int ticketsWon = 0;
+         if (static_cast<size_t>(m_currentSelectorIndex) < m_roulettePrizes.size()) {
+             auto& prize = m_roulettePrizes[m_currentSelectorIndex];
+             GenericPrizeResult result;
+             result.type = prize.type;
+             result.id = prize.id;
+             result.quantity = prize.quantity;
+             result.displayName = prize.displayName;
+             result.category = prize.category;
+             switch (prize.type) {
+             case RewardType::Badge: {
+                 auto* badgeInfo = g_streakData.getBadgeInfo(prize.id);
+                 if (badgeInfo) {
+                     result.spriteName = badgeInfo->spriteName;
+                     result.isNew = !g_streakData.isBadgeUnlocked(prize.id);
+                     if (result.isNew) {
+                         g_streakData.unlockBadge(prize.id);
+                     }
+                     else {
+                         ticketsWon = g_streakData.getTicketValueForRarity(badgeInfo->category);
+                         g_streakData.starTickets += ticketsWon;
+                         result.ticketsFromDuplicate = ticketsWon;
+                     }
+                 }
+                 break;
+             }
+             case RewardType::SuperStar: {
+                 g_streakData.superStars += prize.quantity;
+                 result.spriteName = prize.spriteName;
+                 break;
+             }
+             case RewardType::StarTicket: {
+                 ticketsWon = prize.quantity;
+                 g_streakData.starTickets += ticketsWon;
+                 result.spriteName = prize.spriteName;
+                 break;
+             }
+             }
+             GenericPrizePopup::create(result, [ticketsWon]() {
+                 if (ticketsWon > 0) {
+                     CCDirector::sharedDirector()->getRunningScene()->addChild(TicketAnimationLayer::create(ticketsWon), 1000);
+                 }
+                 })->show();
+         }
+         g_streakData.save();
+         updateAllCheckmarks();
+     }
+
+     void onOpenShop(CCObject*) {
+         ShopPopup::create()->show();
+     }
+
+     void onShowProbabilities(CCObject*) {
+         std::map<StreakData::BadgeCategory, int> categoryWeights;
+         int totalWeight = 0;
+         for (const auto& prize : m_roulettePrizes) {
+             categoryWeights[prize.category] += prize.probabilityWeight;
+             totalWeight += prize.probabilityWeight;
+         }
+
+         std::string message = "";
+         auto getColorForCategory = [](StreakData::BadgeCategory cat) -> std::string {
+             switch (cat) {
+             case StreakData::BadgeCategory::MYTHIC:    return "<cr>";
+             case StreakData::BadgeCategory::LEGENDARY: return "<co>";
+             case StreakData::BadgeCategory::EPIC:      return "<cp>";
+             case StreakData::BadgeCategory::SPECIAL:   return "<cg>";
+             default:                                   return "<cy>";
+             }
+             };
+
+         for (const auto& [category, weight] : categoryWeights) {
+             float percentage = (static_cast<float>(weight) / totalWeight) * 100.f;
+             message += fmt::format("{}{}:</c> {:.2f}%\n",
+                 getColorForCategory(category),
+                 g_streakData.getCategoryName(category),
+                 percentage
+             );
+         }
+
+         message += fmt::format("\n<cp>Total Spins:</c> {}", g_streakData.totalSpins);
+         FLAlertLayer::create("Probabilities", message, "OK")->show();
+     }
 
      std::string getQualitySpriteName(StreakData::BadgeCategory category) {
          switch (category) {
@@ -1377,512 +1868,16 @@ public:
      }
 
  public:
-     static RoulettePopup* create();
+     static RoulettePopup* create() {
+         auto ret = new RoulettePopup();
+         if (ret && ret->initAnchored(260.f, 260.f)) {
+             ret->autorelease();
+             return ret;
+         }
+         CC_SAFE_DELETE(ret);
+         return nullptr;
+     }
  };
-
- // --- Implementación de las funciones ---
-
- RoulettePopup* RoulettePopup::create() {
-     auto ret = new RoulettePopup();
-     if (ret && ret->initAnchored(260.f, 260.f)) {
-         ret->autorelease();
-         return ret;
-     }
-     CC_SAFE_DELETE(ret);
-     return nullptr;
- }
-
- void RoulettePopup::onShowProbabilities(CCObject*) {
-     // 1. Contar los pesos de cada categoría y el peso total
-     std::map<StreakData::BadgeCategory, int> categoryWeights;
-     int totalWeight = 0;
-     for (const auto& prize : m_roulettePrizes) {
-         categoryWeights[prize.category] += prize.probabilityWeight;
-         totalWeight += prize.probabilityWeight;
-     }
-
-     // 2. Crear el mensaje formateado con colores
-     std::string message = "";
-     auto getColorForCategory = [](StreakData::BadgeCategory cat) -> std::string {
-         switch (cat) {
-         case StreakData::BadgeCategory::MYTHIC:    return "<cr>"; // Rojo
-         case StreakData::BadgeCategory::LEGENDARY: return "<co>"; // Naranja
-         case StreakData::BadgeCategory::EPIC:      return "<cp>"; // Púrpura
-         case StreakData::BadgeCategory::SPECIAL:   return "<cg>"; // Verde
-         default:                                   return "<cy>"; // Amarillo
-         }
-         };
-
-     for (const auto& [category, weight] : categoryWeights) {
-         float percentage = (static_cast<float>(weight) / totalWeight) * 100.f;
-         message += fmt::format("{}{}:</c> {:.2f}%\n",
-             getColorForCategory(category),
-             g_streakData.getCategoryName(category),
-             percentage
-         );
-     }
-
-     // --- ¡NUEVO! Se añade el contador de spins al final del mensaje ---
-     message += fmt::format("\n<cp>Total Spins:</c> {}", g_streakData.totalSpins);
-     // -----------------------------------------------------------------
-
-     // 3. Mostrar el popup de alerta
-     FLAlertLayer::create("Probabilities", message, "OK")->show();
- }
-
- bool RoulettePopup::setup() {
-     this->setTitle("Roulette");
-     auto winSize = m_mainLayer->getContentSize();
-     g_streakData.load();
-     m_currentSelectorIndex = g_streakData.lastRouletteIndex;
-     m_mythicColors = {
-         ccc3(255, 0, 0), ccc3(255, 165, 0), ccc3(255, 255, 0), ccc3(0, 255, 0),
-         ccc3(0, 0, 255), ccc3(75, 0, 130), ccc3(238, 130, 238)
-     };
-     m_currentColor = m_mythicColors[0];
-     m_targetColor = m_mythicColors[1];
-     m_rouletteNode = CCNode::create();
-     m_rouletteNode->setPosition({ winSize.width / 2, winSize.height / 2 + 10.f });
-     m_mainLayer->addChild(m_rouletteNode);
-     m_roulettePrizes = {
-         { RewardType::Badge, "super_star_badge", 1, "", "First Mythic", 1, StreakData::BadgeCategory::MYTHIC },
-         { RewardType::Badge, "gold_streak_badge", 1, "", "Gold Legend's", 3, StreakData::BadgeCategory::LEGENDARY },
-         { RewardType::Badge, "dark_streak_badge", 1, "", "dark side", 5, StreakData::BadgeCategory::EPIC },
-         { RewardType::Badge, "ncs_badge", 1, "", "NCS lover", 10, StreakData::BadgeCategory::SPECIAL },
-         { RewardType::Badge, "beta_badge", 1, "", "Player beta?", 70, StreakData::BadgeCategory::COMMON },
-         { RewardType::Badge, "platino_streak_badge", 1, "", "platino badge", 70, StreakData::BadgeCategory::COMMON },
-         { RewardType::StarTicket, "star_tiket_1", 1, "star_tiket.png"_spr, "1 star tiket", 70, StreakData::BadgeCategory::COMMON },
-         { RewardType::StarTicket, "star_tiket_3", 3, "star_tiket.png"_spr, "3 star tiket", 70, StreakData::BadgeCategory::COMMON },
-         { RewardType::StarTicket, "star_ticket_15", 15, "star_tiket.png"_spr, "15 Tickets", 70, StreakData::BadgeCategory::COMMON },
-         { RewardType::StarTicket, "star_ticket_30", 30, "star_tiket.png"_spr, "30 Tickets", 10, StreakData::BadgeCategory::SPECIAL },
-         { RewardType::StarTicket, "star_ticket_60", 60, "star_tiket.png"_spr, "60 Tickets", 5, StreakData::BadgeCategory::EPIC },
-         { RewardType::StarTicket, "star_ticket_100", 100, "star_tiket.png"_spr, "100 Tickets", 3, StreakData::BadgeCategory::LEGENDARY }
-     };
-
-     const int gridSize = 4;
-     m_slotSize = 38.f;
-     const float spacing = 5.f;
-     const float totalSize = (gridSize * m_slotSize) + ((gridSize - 1) * spacing);
-     const float startPos = -totalSize / 2.f + m_slotSize / 2.f;
-     std::vector<CCPoint> slotPositions;
-     for (int i = 0; i < gridSize; ++i) slotPositions.push_back({ startPos + i * (m_slotSize + spacing), startPos + (gridSize - 1) * (m_slotSize + spacing) });
-     for (int i = gridSize - 2; i > 0; --i) slotPositions.push_back({ startPos + (gridSize - 1) * (m_slotSize + spacing), startPos + i * (m_slotSize + spacing) });
-     for (int i = gridSize - 1; i >= 0; --i) slotPositions.push_back({ startPos + i * (m_slotSize + spacing), startPos });
-     for (int i = 1; i < gridSize - 1; ++i) slotPositions.push_back({ startPos, startPos + i * (m_slotSize + spacing) });
-     for (size_t i = 0; i < slotPositions.size(); ++i) {
-         if (i >= m_roulettePrizes.size()) continue;
-         auto& currentPrize = m_roulettePrizes[i];
-         auto slotContainer = CCNode::create();
-         slotContainer->setPosition(slotPositions[i]);
-         m_rouletteNode->addChild(slotContainer);
-         m_orderedSlots.push_back(slotContainer);
-         auto slotBG = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
-         slotBG->setContentSize({ m_slotSize, m_slotSize });
-         slotBG->setColor({ 0, 0, 0 });
-         slotBG->setOpacity(150);
-         slotContainer->addChild(slotBG);
-         auto qualitySprite = CCSprite::create(getQualitySpriteName(currentPrize.category).c_str());
-         qualitySprite->setScale((m_slotSize - 4.f) / qualitySprite->getContentSize().width);
-         slotContainer->addChild(qualitySprite, 1);
-         if (currentPrize.category == StreakData::BadgeCategory::MYTHIC) m_mythicSprites.push_back(qualitySprite);
-         if (currentPrize.type == RewardType::Badge) {
-             auto* badgeInfo = g_streakData.getBadgeInfo(currentPrize.id);
-             if (badgeInfo) {
-                 auto rewardIcon = CCSprite::create(badgeInfo->spriteName.c_str());
-                 rewardIcon->setScale(0.15f);
-                 slotContainer->addChild(rewardIcon, 2);
-                 if (g_streakData.isBadgeUnlocked(badgeInfo->badgeID)) {
-                     auto claimedIcon = CCSprite::createWithSpriteFrameName("GJ_completesIcon_001.png");
-                     claimedIcon->setScale(0.5f);
-                     claimedIcon->setPosition({ m_slotSize / 2 - 5, -m_slotSize / 2 + 5 });
-                     claimedIcon->setTag(199);
-                     slotContainer->addChild(claimedIcon, 3);
-                 }
-             }
-         }
-         else {
-             auto rewardIcon = CCSprite::create(currentPrize.spriteName.c_str());
-             rewardIcon->setScale(0.2f);
-             slotContainer->addChild(rewardIcon, 2);
-             auto quantityLabel = CCLabelBMFont::create(CCString::createWithFormat("x%d", currentPrize.quantity)->getCString(), "goldFont.fnt");
-             quantityLabel->setScale(0.3f);
-             quantityLabel->setPosition(0, -m_slotSize / 2 + 5);
-             slotContainer->addChild(quantityLabel, 3);
-         }
-     }
-     m_selectorSprite = CCSprite::create("casilla_selector.png"_spr);
-     m_selectorSprite->setScale(m_slotSize / m_selectorSprite->getContentSize().width);
-     if (!m_orderedSlots.empty()) m_selectorSprite->setPosition(m_orderedSlots[m_currentSelectorIndex]->getPosition());
-     m_rouletteNode->addChild(m_selectorSprite, 4);
-
-     // --- === NUEVO DISEÑO DE BOTONES Y CONTADORES (v2) === ---
-     m_spinBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Spin"), this, menu_selector(RoulettePopup::onSpin));
-     m_spin10Btn = CCMenuItemSpriteExtra::create(ButtonSprite::create("x10"), this, menu_selector(RoulettePopup::onSpinMultiple));
-     auto spinMenu = CCMenu::create();
-     spinMenu->addChild(m_spinBtn);
-     spinMenu->addChild(m_spin10Btn);
-     spinMenu->alignItemsHorizontallyWithPadding(10.f);
-     spinMenu->setPosition({ winSize.width / 2, 30.f });
-     m_mainLayer->addChild(spinMenu);
-
-     auto shopSprite = CCSprite::create("shop_btn.png"_spr);
-     shopSprite->setScale(0.7f);
-     auto shopBtn = CCMenuItemSpriteExtra::create(shopSprite, this, menu_selector(RoulettePopup::onOpenShop));
-     auto shopMenu = CCMenu::createWithItem(shopBtn);
-     shopMenu->setPosition({ winSize.width - 35.f, 30.f });
-     m_mainLayer->addChild(shopMenu);
-
-
-
-     auto superStarCounterNode = CCNode::create();
-     auto haveAmountLabel = CCLabelBMFont::create(std::to_string(g_streakData.superStars).c_str(), "goldFont.fnt");
-     haveAmountLabel->setScale(0.4f);
-     haveAmountLabel->setAnchorPoint({ 1.f, 0.5f });
-     haveAmountLabel->setID("roulette-super-star-label");
-     superStarCounterNode->addChild(haveAmountLabel);
-     auto haveStar = CCSprite::create("super_star.png"_spr);
-     haveStar->setScale(0.12f);
-     superStarCounterNode->addChild(haveStar);
-     haveAmountLabel->setPosition({ -haveStar->getScaledContentSize().width / 2 - 2, 0 });
-     haveStar->setPosition({ haveAmountLabel->getScaledContentSize().width / 2, 0 });
-     superStarCounterNode->setPosition({ winSize.width - 35.f, winSize.height - 25.f });
-     m_mainLayer->addChild(superStarCounterNode);
-
-     auto infoIcon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png");
-     infoIcon->setScale(0.8f);
-     auto infoBtn = CCMenuItemSpriteExtra::create(infoIcon, this, menu_selector(RoulettePopup::onShowProbabilities));
-     auto infoMenu = CCMenu::createWithItem(infoBtn);
-     infoMenu->setPosition({ 25.f, winSize.height - 25.f });
-     m_mainLayer->addChild(infoMenu);
-
-     this->scheduleUpdate();
-     return true;
- }
-
- void RoulettePopup::update(float dt) {
-     if (m_mythicSprites.empty()) return;
-     m_colorTransitionTime += dt;
-     float transitionDuration = 1.0f;
-     if (m_colorTransitionTime >= transitionDuration) {
-         m_colorTransitionTime = 0.0f;
-         m_colorIndex = (m_colorIndex + 1) % m_mythicColors.size();
-         m_currentColor = m_targetColor;
-         m_targetColor = m_mythicColors[(m_colorIndex + 1) % m_mythicColors.size()];
-     }
-     float progress = m_colorTransitionTime / transitionDuration;
-     ccColor3B interpolatedColor = {
-         static_cast<GLubyte>(m_currentColor.r + (m_targetColor.r - m_currentColor.r) * progress),
-         static_cast<GLubyte>(m_currentColor.g + (m_targetColor.g - m_currentColor.g) * progress),
-         static_cast<GLubyte>(m_currentColor.b + (m_targetColor.b - m_currentColor.b) * progress)
-     };
-     for (auto* sprite : m_mythicSprites) sprite->setColor(interpolatedColor);
- }
-
- void RoulettePopup::onSpin(CCObject*) {
-     g_streakData.load();
-     if (g_streakData.superStars < 1) {
-         FLAlertLayer::create("Not Enough Super Stars", "You need at least <cy>1 Super Star</c> to spin.", "OK")->show();
-         return;
-     }
-     if (m_isSpinning) return;
-     m_isSpinning = true;
-     m_spinBtn->setEnabled(false);
-     m_spin10Btn->setEnabled(false);
-     g_streakData.superStars -= 1;
-     g_streakData.totalSpins += 1;
-     g_streakData.save();
-     auto starCountLabel = static_cast<CCLabelBMFont*>(m_mainLayer->getChildByIDRecursive("roulette-super-star-label"));
-     if (starCountLabel) starCountLabel->setString(std::to_string(g_streakData.superStars).c_str());
-     auto spinCountLabel = static_cast<CCLabelBMFont*>(m_mainLayer->getChildByIDRecursive("roulette-spin-count-label"));
-     if (spinCountLabel) spinCountLabel->setString(CCString::createWithFormat("Spins: %d", g_streakData.totalSpins)->getCString());
-     int totalWeight = 0;
-     for (const auto& prize : m_roulettePrizes) totalWeight += prize.probabilityWeight;
-     int randomValue = rand() % totalWeight;
-     int winningIndex = 0;
-     for (size_t i = 0; i < m_roulettePrizes.size(); ++i) {
-         if (randomValue < m_roulettePrizes[i].probabilityWeight) {
-             winningIndex = i;
-             break;
-         }
-         randomValue -= m_roulettePrizes[i].probabilityWeight;
-     }
-     int totalSlots = m_orderedSlots.size();
-     int laps = 5;
-     int distance = (winningIndex - m_currentSelectorIndex + totalSlots) % totalSlots;
-     m_totalSteps = (laps * totalSlots) + distance;
-     auto actions = CCArray::create();
-     for (int i = 1; i <= m_totalSteps; ++i) {
-         int stepIndex = (m_currentSelectorIndex + i) % totalSlots;
-         auto targetSlot = m_orderedSlots[stepIndex];
-         float duration = 0.05f;
-         if (i < 5) duration = 0.2f - (i * 0.03f);
-         else if (i > m_totalSteps - 10) duration = 0.05f + ((i - (m_totalSteps - 10)) * 0.04f);
-         auto moveAction = CCEaseSineInOut::create(CCMoveTo::create(duration, targetSlot->getPosition()));
-         auto popAction = CCSequence::create(CCScaleTo::create(duration / 2, 1.1f), CCScaleTo::create(duration / 2, 1.0f), nullptr);
-         auto soundAction = CCCallFunc::create(this, callfunc_selector(RoulettePopup::playTickSound));
-         auto slotAnimation = CCTargetedAction::create(targetSlot, popAction);
-         actions->addObject(CCSpawn::create(moveAction, slotAnimation, soundAction, nullptr));
-     }
-     actions->addObject(CCCallFunc::create(this, callfunc_selector(RoulettePopup::onSpinEnd)));
-     m_selectorSprite->runAction(CCSequence::create(actions));
- }
-
- void RoulettePopup::onSpinMultiple(CCObject*) {
-     g_streakData.load();
-     if (g_streakData.superStars < 10) {
-         FLAlertLayer::create("Not Enough Super Stars", "You need at least <cy>10 Super Stars</c> to spin x10.", "OK")->show();
-         return;
-     }
-     if (m_isSpinning) return;
-     m_isSpinning = true;
-     m_spinBtn->setEnabled(false);
-     m_spin10Btn->setEnabled(false);
-     g_streakData.superStars -= 10;
-     g_streakData.totalSpins += 10;
-     std::vector<GenericPrizeResult> allPrizes;
-     int totalTicketsWon = 0;
-     m_pendingMythics.clear();
-     std::vector<int> winningIndices;
-     int totalWeight = 0;
-     for (const auto& prize : m_roulettePrizes) totalWeight += prize.probabilityWeight;
-     for (int i = 0; i < 10; ++i) {
-         int randomValue = rand() % totalWeight;
-         int winningIndex = 0;
-         for (size_t j = 0; j < m_roulettePrizes.size(); ++j) {
-             if (randomValue < m_roulettePrizes[j].probabilityWeight) {
-                 winningIndex = j;
-                 break;
-             }
-             randomValue -= m_roulettePrizes[j].probabilityWeight;
-         }
-         winningIndices.push_back(winningIndex);
-         auto& prize = m_roulettePrizes[winningIndex];
-         GenericPrizeResult result;
-         result.type = prize.type;
-         result.id = prize.id;
-         result.quantity = prize.quantity;
-         result.displayName = prize.displayName;
-         result.category = prize.category;
-         switch (prize.type) {
-         case RewardType::Badge: {
-             auto* badgeInfo = g_streakData.getBadgeInfo(prize.id);
-             if (badgeInfo) {
-                 result.spriteName = badgeInfo->spriteName;
-                 result.isNew = !g_streakData.isBadgeUnlocked(prize.id);
-                 if (result.isNew) {
-                     g_streakData.unlockBadge(prize.id);
-                     if (badgeInfo->category == StreakData::BadgeCategory::MYTHIC) {
-                         m_pendingMythics.push_back(*badgeInfo);
-                     }
-                 }
-                 else {
-                     int tickets = g_streakData.getTicketValueForRarity(badgeInfo->category);
-                     g_streakData.starTickets += tickets;
-                     totalTicketsWon += tickets;
-                     result.ticketsFromDuplicate = tickets;
-                 }
-             }
-             break;
-         }
-         case RewardType::SuperStar: {
-             g_streakData.superStars += prize.quantity;
-             result.spriteName = prize.spriteName;
-             break;
-         }
-         case RewardType::StarTicket: {
-             g_streakData.starTickets += prize.quantity;
-             totalTicketsWon += prize.quantity;
-             result.spriteName = prize.spriteName;
-             break;
-         }
-         }
-         allPrizes.push_back(result);
-     }
-     m_multiSpinResults = allPrizes;
-     g_streakData.save();
-     if (auto starCountLabel = static_cast<CCLabelBMFont*>(m_mainLayer->getChildByIDRecursive("roulette-super-star-label"))) {
-         starCountLabel->setString(std::to_string(g_streakData.superStars).c_str());
-     }
-     if (auto spinCountLabel = static_cast<CCLabelBMFont*>(m_mainLayer->getChildByIDRecursive("roulette-spin-count-label"))) {
-         spinCountLabel->setString(CCString::createWithFormat("Spins: %d", g_streakData.totalSpins)->getCString());
-     }
-     auto actions = CCArray::create();
-     int totalSlots = m_orderedSlots.size();
-     int lastIndex = m_currentSelectorIndex;
-     for (int prizeIndex : winningIndices) {
-         int distance = (prizeIndex - lastIndex + totalSlots) % totalSlots;
-         if (distance == 0) distance = totalSlots;
-         for (int i = 1; i <= distance; ++i) {
-             int stepIndex = (lastIndex + i) % totalSlots;
-             auto targetSlot = m_orderedSlots[stepIndex];
-             float moveDuration = 0.04f;
-             auto moveAction = CCMoveTo::create(moveDuration, targetSlot->getPosition());
-             auto soundAction = CCCallFunc::create(this, callfunc_selector(RoulettePopup::playTickSound));
-             auto popAction = CCSequence::create(CCScaleTo::create(moveDuration / 2, 1.1f), CCScaleTo::create(moveDuration / 2, 1.0f), nullptr);
-             auto slotAnimation = CCTargetedAction::create(targetSlot, popAction);
-             actions->addObject(CCSpawn::create(moveAction, soundAction, slotAnimation, nullptr));
-         }
-         actions->addObject(CCDelayTime::create(0.25f));
-         actions->addObject(CCCallFuncO::create(this, callfuncO_selector(RoulettePopup::flashWinningSlot), CCInteger::create(prizeIndex)));
-         lastIndex = prizeIndex;
-     }
-     m_currentSelectorIndex = lastIndex;
-     actions->addObject(CCCallFunc::create(this, callfunc_selector(RoulettePopup::onMultiSpinEnd)));
-     m_selectorSprite->runAction(CCSequence::create(actions));
- }
-
- void RoulettePopup::flashWinningSlot(CCObject* pSender) {
-     int slotIndex = static_cast<CCInteger*>(pSender)->getValue();
-     if (static_cast<size_t>(slotIndex) >= m_orderedSlots.size()) return;
-     auto targetSlot = m_orderedSlots[slotIndex];
-     auto glow = CCSprite::create("cuadro.png"_spr);
-     if (!glow) return;
-     glow->setPosition(targetSlot->getContentSize() / 2);
-     glow->setScale(m_slotSize / glow->getContentSize().width);
-     glow->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
-     glow->setColor({ 255, 255, 150 });
-     glow->setOpacity(0);
-     glow->runAction(CCSequence::create(
-         CCFadeTo::create(0.2f, 200),
-         CCFadeTo::create(0.3f, 0),
-         CCRemoveSelf::create(),
-         nullptr
-     ));
-     targetSlot->addChild(glow, 5);
- }
-
- void RoulettePopup::processMythicQueue() {
-     if (!m_pendingMythics.empty()) {
-         auto mythicBadge = m_pendingMythics.front();
-         m_pendingMythics.erase(m_pendingMythics.begin());
-         auto animLayer = MythicAnimationLayer::create(mythicBadge, [this]() {
-             this->processMythicQueue();
-             });
-         CCDirector::sharedDirector()->getRunningScene()->addChild(animLayer, 400);
-     }
-     else {
-         MultiPrizePopup::create(m_multiSpinResults, [this]() {
-             if (m_spinBtn && m_spin10Btn) {
-                 m_spinBtn->setEnabled(true);
-                 m_spin10Btn->setEnabled(true);
-             }
-             })->show();
-     }
- }
-
- void RoulettePopup::onMultiSpinEnd() {
-     m_isSpinning = false;
-     updateAllCheckmarks();
-     g_streakData.lastRouletteIndex = m_currentSelectorIndex;
-     g_streakData.save();
-     m_pendingMythics.clear();
-     int totalTicketsWonInSpin = 0;
-     for (const auto& result : m_multiSpinResults) {
-         if (result.isNew && result.type == RewardType::Badge && result.category == StreakData::BadgeCategory::MYTHIC) {
-             auto* badgeInfo = g_streakData.getBadgeInfo(result.id);
-             if (badgeInfo) {
-                 m_pendingMythics.push_back(*badgeInfo);
-             }
-         }
-         if (result.type == RewardType::StarTicket) {
-             totalTicketsWonInSpin += result.quantity;
-         }
-         else if (result.type == RewardType::Badge && !result.isNew) {
-             totalTicketsWonInSpin += result.ticketsFromDuplicate;
-         }
-     }
-     if (!m_pendingMythics.empty()) {
-         processMythicQueue();
-     }
-     else {
-         MultiPrizePopup::create(m_multiSpinResults, [this, totalTicketsWonInSpin]() {
-             m_spinBtn->setEnabled(true);
-             m_spin10Btn->setEnabled(true);
-             if (totalTicketsWonInSpin > 0) {
-                 CCDirector::sharedDirector()->getRunningScene()->addChild(TicketAnimationLayer::create(totalTicketsWonInSpin), 1000);
-             }
-             })->show();
-     }
- }
-
- void RoulettePopup::updateAllCheckmarks() {
-     for (size_t i = 0; i < m_orderedSlots.size(); ++i) {
-         if (i >= m_roulettePrizes.size()) continue;
-         auto& prize = m_roulettePrizes[i];
-         if (prize.type != RewardType::Badge) continue;
-         auto slotNode = m_orderedSlots[i];
-         if (g_streakData.isBadgeUnlocked(prize.id) && !slotNode->getChildByTag(199)) {
-             auto claimedIcon = CCSprite::createWithSpriteFrameName("GJ_completesIcon_001.png");
-             claimedIcon->setScale(0.5f);
-             claimedIcon->setPosition({ m_slotSize / 2 - 5, -m_slotSize / 2 + 5 });
-             claimedIcon->setTag(199);
-             slotNode->addChild(claimedIcon, 3);
-         }
-     }
- }
-
- void RoulettePopup::playTickSound() {
-     FMODAudioEngine::sharedEngine()->playEffect("ruleta_sfx.mp3"_spr);
- }
-
- void RoulettePopup::onSpinEnd() {
-     m_isSpinning = false;
-     m_spinBtn->setEnabled(true);
-     m_spin10Btn->setEnabled(true);
-     int winningIndex = (m_currentSelectorIndex + m_totalSteps) % m_orderedSlots.size();
-     m_currentSelectorIndex = winningIndex;
-     g_streakData.lastRouletteIndex = m_currentSelectorIndex;
-     int ticketsWon = 0;
-     if (static_cast<size_t>(m_currentSelectorIndex) < m_roulettePrizes.size()) {
-         auto& prize = m_roulettePrizes[m_currentSelectorIndex];
-         GenericPrizeResult result;
-         result.type = prize.type;
-         result.id = prize.id;
-         result.quantity = prize.quantity;
-         result.displayName = prize.displayName;
-         result.category = prize.category;
-         switch (prize.type) {
-         case RewardType::Badge: {
-             auto* badgeInfo = g_streakData.getBadgeInfo(prize.id);
-             if (badgeInfo) {
-                 result.spriteName = badgeInfo->spriteName;
-                 result.isNew = !g_streakData.isBadgeUnlocked(prize.id);
-                 if (result.isNew) {
-                     g_streakData.unlockBadge(prize.id);
-                 }
-                 else {
-                     ticketsWon = g_streakData.getTicketValueForRarity(badgeInfo->category);
-                     g_streakData.starTickets += ticketsWon;
-                     result.ticketsFromDuplicate = ticketsWon;
-                 }
-             }
-             break;
-         }
-         case RewardType::SuperStar: {
-             g_streakData.superStars += prize.quantity;
-             result.spriteName = prize.spriteName;
-             break;
-         }
-         case RewardType::StarTicket: {
-             ticketsWon = prize.quantity;
-             g_streakData.starTickets += ticketsWon;
-             result.spriteName = prize.spriteName;
-             break;
-         }
-         }
-         GenericPrizePopup::create(result, [ticketsWon]() {
-             if (ticketsWon > 0) {
-                 CCDirector::sharedDirector()->getRunningScene()->addChild(TicketAnimationLayer::create(ticketsWon), 1000);
-             }
-             })->show();
-     }
-     g_streakData.save();
-     updateAllCheckmarks();
- }
-
- void RoulettePopup::onOpenShop(CCObject*) {
-     ShopPopup::create()->show();
- }
 
 
 
@@ -2214,9 +2209,9 @@ protected:
         bool isClaimed;
 
         switch (missionID) {
-        case 0: title = "Star Collector"; targetStars = 15; reward = 1; isClaimed = g_streakData.starMission1Claimed; break;
-        case 1: title = "Star Gatherer"; targetStars = 30; reward = 2; isClaimed = g_streakData.starMission2Claimed; break;
-        case 2: title = "Star Master"; targetStars = 45; reward = 3; isClaimed = g_streakData.starMission3Claimed; break;
+        case 0: title = "Star Collector"; targetStars = 15; reward = 2; isClaimed = g_streakData.starMission1Claimed; break;
+        case 1: title = "Star Gatherer"; targetStars = 30; reward = 3; isClaimed = g_streakData.starMission2Claimed; break;
+        case 2: title = "Star Master"; targetStars = 45; reward = 5; isClaimed = g_streakData.starMission3Claimed; break;
         default: return CCNode::create();
         }
         bool isComplete = g_streakData.starsToday >= targetStars;
@@ -2361,32 +2356,27 @@ protected:
         g_streakData.load();
 
         switch (missionID) {
-        case 0: g_streakData.superStars += 1; g_streakData.starMission1Claimed = true; break;
-        case 1: g_streakData.superStars += 2; g_streakData.starMission2Claimed = true; break;
-        case 2: g_streakData.superStars += 3; g_streakData.starMission3Claimed = true; break;
+        case 0: g_streakData.superStars += 2; g_streakData.starMission1Claimed = true; break;
+        case 1: g_streakData.superStars += 3; g_streakData.starMission2Claimed = true; break;
+        case 2: g_streakData.superStars += 5; g_streakData.starMission3Claimed = true; break;
         }
         g_streakData.save();
 
-        // --- CORRECCIÓN DEFINITIVA: Actualizamos el contador buscando en la capa principal ---
-        auto countLabel = static_cast<CCLabelBMFont*>(this->m_mainLayer->getChildByID("super-star-label"));
-        auto bg = static_cast<cocos2d::extension::CCScale9Sprite*>(this->m_mainLayer->getChildByID("super-star-bg"));
-        if (countLabel && bg) {
-            // 1. Actualizamos el texto
+        // --- LÓGICA DE ACTUALIZACIÓN DEL CONTADOR CORREGIDA ---
+        auto countLabel = static_cast<CCLabelBMFont*>(this->m_mainLayer->getChildByIDRecursive("super-star-label"));
+        auto starSprite = static_cast<CCSprite*>(this->m_mainLayer->getChildByIDRecursive("super-star-icon"));
+
+        // Ya no busca el fondo "bg"
+        if (countLabel && starSprite) {
+            // 1. Actualizamos el texto del contador
             countLabel->setString(std::to_string(g_streakData.superStars).c_str());
 
-            // 2. Reajustamos el tamaño del fondo para que se adapte al nuevo número (si cambia de dígitos)
-            bg->setContentSize({
-                (countLabel->getContentSize().width * countLabel->getScale()) + 50.f,
-                (countLabel->getContentSize().height * countLabel->getScale()) + 5.f
-                });
-
-            // 3. Reposicionamos los elementos por si el tamaño del fondo cambió
-            auto starSprite = this->m_mainLayer->getChildByID("super-star-icon");
-            bg->setPosition({ starSprite->getPositionX() + starSprite->getScaledContentSize().width / 2 + bg->getScaledContentSize().width / 2, starSprite->getPositionY() });
-            countLabel->setPosition(bg->getPosition());
+            // 2. Reposicionamos la etiqueta a la derecha del icono para que se ajuste si el número cambia
+            countLabel->setPosition(starSprite->getPosition() + CCPoint{ starSprite->getScaledContentSize().width + 5.f, 0 });
         }
+        // --------------------------------------------------------
 
-        // --- La animación de las misiones se queda igual ---
+        // La animación de las misiones se queda igual
         auto menu = static_cast<CCMenu*>(m_mainLayer->getChildByID("missions-menu"));
         if (!menu) return;
 
