@@ -2821,7 +2821,7 @@ CCAction* createShakeAction(float duration, float strength) {
 
 
 
-
+// ============= POPUP PRINCIPAL (VERSIÓN FINAL SIN PARTÍCULAS) ==============
 class InfoPopup : public Popup<> {
 protected:
     bool setup() override {
@@ -2955,7 +2955,6 @@ protected:
         menu->addChild(infoBtn);
         m_mainLayer->addChild(menu, 10);
 
-        // --- NUEVO BOTÓN DE HISTORIAL ---
         auto historyIcon = CCSprite::create("historial_btn.png"_spr);
         historyIcon->setScale(0.7f);
         auto historyBtn = CCMenuItemSpriteExtra::create(historyIcon, this, menu_selector(InfoPopup::onOpenHistory));
@@ -2963,7 +2962,6 @@ protected:
         historyMenu->addChild(historyBtn);
         historyMenu->setPosition({ 20, 20 });
         m_mainLayer->addChild(historyMenu, 10);
-        // -------------------------------
 
         if (g_streakData.shouldShowAnimation()) {
             this->showStreakAnimation(g_streakData.currentStreak);
@@ -2971,10 +2969,7 @@ protected:
         return true;
     }
 
-    void onOpenHistory(CCObject*) {
-        HistoryPopup::create()->show();
-    }
-
+    void onOpenHistory(CCObject*) { HistoryPopup::create()->show(); }
     void onOpenStats(CCObject*) { DayProgressPopup::create()->show(); }
     void onOpenRewards(CCObject*) { RewardsPopup::create()->show(); }
     void onRachaClick(CCObject*) { AllRachasPopup::create()->show(); }
@@ -2982,7 +2977,7 @@ protected:
 
     void onOpenRoulette(CCObject*) {
         g_streakData.load();
-        if (g_streakData.currentStreak < 1) { // Puedes ajustar este requerimiento si quieres
+        if (g_streakData.currentStreak < 1) {
             FLAlertLayer::create("Roulette Locked", "You need a streak of at least <cg>1 day</c> to use the roulette.", "OK")->show();
             return;
         }
@@ -2999,8 +2994,6 @@ protected:
             "OK"
         )->show();
     }
-
-    //animacion de racha
 
     void showStreakAnimation(int streakLevel) {
         auto winSize = CCDirector::sharedDirector()->getWinSize();
@@ -3051,49 +3044,17 @@ protected:
         daysLabel->setTag(3);
         animLayer->addChild(daysLabel, 5);
 
-        // --- MODIFICACIÓN PARA MÓVILES ---
-        // Solo creamos la estela de partículas en plataformas que no son móviles
-#if !defined(GEODE_IS_MOBILE)
-        auto trail = ManualParticleEmitter::create();
-        trail->setPosition(rachaSprite->getPosition());
-        trail->setTag(5);
-        animLayer->addChild(trail, 1);
-#endif
-
         float entranceDuration = 0.8f;
         auto entranceMove = CCEaseElasticOut::create(CCMoveTo::create(entranceDuration, { winSize.width / 2, winSize.height / 2 }), 0.5f);
         auto entranceScale = CCEaseBackOut::create(CCScaleTo::create(entranceDuration, 1.2f));
         auto entranceRotate = CCEaseExponentialOut::create(CCRotateTo::create(entranceDuration, 0.f));
-
         auto auraMove = CCMoveTo::create(entranceDuration, { winSize.width / 2, winSize.height / 2 });
-
-        // --- MODIFICACIÓN PARA MÓVILES ---
-#if !defined(GEODE_IS_MOBILE)
-        auto trailMove = CCMoveTo::create(entranceDuration, { winSize.width / 2, winSize.height / 2 });
-#endif
-
         auto shineMove = CCMoveTo::create(entranceDuration, { winSize.width / 2, winSize.height / 2 });
 
         aura->runAction(auraMove);
 
-        // --- MODIFICACIÓN PARA MÓVILES ---
-#if !defined(GEODE_IS_MOBILE)
-        if (auto trail = static_cast<ManualParticleEmitter*>(animLayer->getChildByTag(5))) {
-            trail->runAction(CCSequence::create(
-                trailMove,
-                CCCallFunc::create(trail, callfunc_selector(ManualParticleEmitter::stopEmitting)),
-                nullptr
-            ));
-        }
-#endif
-
         shineBurst->runAction(CCSequence::create(
-            CCSpawn::create(
-                shineMove,
-                CCFadeIn::create(entranceDuration * 0.5f),
-                CCScaleTo::create(entranceDuration, 6.2f),
-                nullptr
-            ),
+            CCSpawn::create(shineMove, CCFadeIn::create(entranceDuration * 0.5f), CCScaleTo::create(entranceDuration, 6.2f), nullptr),
             CCCallFunc::create(this, callfunc_selector(InfoPopup::startShineRotation)),
             nullptr
         ));
@@ -3110,11 +3071,9 @@ protected:
     void startShineRotation() {
         auto animLayer = this->getChildByTag(111);
         if (!animLayer) return;
-
         if (auto shineBurst = static_cast<CCSprite*>(animLayer->getChildByTag(6))) {
             auto rotate = CCRotateBy::create(8.0f, 360);
-            auto repeatRotate = CCRepeatForever::create(rotate);
-            shineBurst->runAction(repeatRotate);
+            shineBurst->runAction(CCRepeatForever::create(rotate));
             shineBurst->setOpacity(150);
         }
     }
@@ -3132,11 +3091,7 @@ protected:
         shockwave->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
         shockwave->setScale(0.2f);
         shockwave->runAction(CCSequence::create(
-            CCSpawn::create(
-                CCScaleTo::create(0.5f, 5.0f),
-                CCFadeOut::create(0.5f),
-                nullptr
-            ),
+            CCSpawn::create(CCScaleTo::create(0.5f, 5.0f), CCFadeOut::create(0.5f), nullptr),
             CCRemoveSelf::create(),
             nullptr
         ));
@@ -3154,7 +3109,6 @@ protected:
 
         if (auto rachaSprite = static_cast<CCSprite*>(animLayer->getChildByTag(1))) {
             rachaSprite->runAction(CCEaseBackOut::create(CCScaleTo::create(0.3f, 1.0f)));
-
             auto breatheIn = CCScaleTo::create(1.5f, 1.05f);
             auto breatheOut = CCScaleTo::create(1.5f, 1.0f);
             rachaSprite->runAction(CCRepeatForever::create(CCSequence::create(breatheIn, breatheOut, nullptr)));
@@ -3162,11 +3116,7 @@ protected:
 
         if (auto aura = static_cast<CCSprite*>(animLayer->getChildByTag(4))) {
             aura->runAction(CCSequence::create(
-                CCSpawn::create(
-                    CCFadeTo::create(0.4f, 150),
-                    CCScaleTo::create(0.4f, 1.5f),
-                    nullptr
-                ),
+                CCSpawn::create(CCFadeTo::create(0.4f, 150), CCScaleTo::create(0.4f, 1.5f), nullptr),
                 CCFadeOut::create(0.3f),
                 nullptr
             ));
@@ -3179,114 +3129,41 @@ protected:
             daysLabel->runAction(CCSequence::create(CCDelayTime::create(0.4f), CCSpawn::create(CCFadeIn::create(0.5f), CCEaseBackOut::create(CCScaleTo::create(0.5f, 1.0f)), nullptr), nullptr));
         }
 
-        // --- MODIFICACIÓN PARA MÓVILES ---
-        // La explosión de partículas solo ocurre en PC
-#if !defined(GEODE_IS_MOBILE)
         animLayer->runAction(CCSequence::create(
-            CCDelayTime::create(1.0f),
-            CCCallFunc::create(this, callfunc_selector(InfoPopup::spawnStarBurst)),
-            CCDelayTime::create(0.5f),
-            CCCallFunc::create(this, callfunc_selector(InfoPopup::spawnStarBurst)),
-            CCDelayTime::create(0.5f),
-            CCCallFunc::create(this, callfunc_selector(InfoPopup::spawnStarBurst)),
-            CCDelayTime::create(2.6f),
+            CCDelayTime::create(3.0f), // Duración de la animación sin partículas
             CCCallFunc::create(this, callfunc_selector(InfoPopup::onAnimationExit)),
             nullptr
         ));
-#else
-// En móvil, la animación es más corta porque no hay partículas
-        animLayer->runAction(CCSequence::create(
-            CCDelayTime::create(3.0f), // Tiempo de espera para poder ver la animación
-            CCCallFunc::create(this, callfunc_selector(InfoPopup::onAnimationExit)),
-            nullptr
-        ));
-#endif
     }
-
-    // --- MODIFICACIÓN PARA MÓVILES ---
-    // Esta función ahora solo se compilará en plataformas que no son móviles
-#if !defined(GEODE_IS_MOBILE)
-    void spawnStarBurst() {
-        auto winSize = CCDirector::sharedDirector()->getWinSize();
-        auto animLayer = static_cast<CCLayer*>(this->getChildByTag(111));
-        if (!animLayer) return;
-
-        std::vector<ccColor3B> colors = {
-            {255, 255, 255}, {255, 215, 0}, {255, 165, 0}, {255, 255, 150}
-        };
-
-        int numStars = 25 + (rand() % 10);
-        float burstStrength = 80.f + (rand() % 50);
-        float burstDuration = 1.0f + (rand() % 5 / 10.f);
-
-        for (int i = 0; i < numStars; ++i) {
-            auto particle = CCSprite::create("cuadro.png"_spr);
-            particle->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
-            particle->setColor(colors[rand() % colors.size()]);
-
-            particle->setPosition({ winSize.width / 2, winSize.height / 2 });
-            particle->setScale(0.1f + (rand() % 3 / 10.f));
-            particle->setRotation(rand() % 90);
-
-            float angle = (static_cast<float>(i) / numStars) * 360.f + (rand() % 20 - 10);
-            float distance = burstStrength * (0.8f + (rand() % 5 / 10.f));
-            CCPoint dest = ccp(winSize.width / 2 + distance * cos(CC_DEGREES_TO_RADIANS(angle)), winSize.height / 2 + distance * sin(CC_DEGREES_TO_RADIANS(angle)));
-
-            particle->runAction(CCSequence::create(
-                CCSpawn::create(
-                    CCEaseExponentialOut::create(CCMoveTo::create(burstDuration, dest)),
-                    CCFadeOut::create(burstDuration),
-                    CCScaleTo::create(burstDuration, 0.0f),
-                    CCRotateBy::create(burstDuration, (rand() % 180) * (rand() % 2 == 0 ? 1 : -1)),
-                    nullptr
-                ),
-                CCRemoveSelf::create(),
-                nullptr
-            ));
-            animLayer->addChild(particle, 1);
-        }
-    }
-#endif
 
     void onAnimationExit() {
         auto animLayer = this->getChildByTag(111);
+        
         if (!animLayer) return;
 
+        // Verificamos CADA objeto antes de intentar animarlo.
         if (auto bg = animLayer->getChildByTag(0)) {
             bg->runAction(CCFadeOut::create(1.0f));
         }
-
         if (auto rachaSprite = static_cast<CCSprite*>(animLayer->getChildByTag(1))) {
             rachaSprite->stopAllActions();
-            rachaSprite->runAction(CCSpawn::create(
-                CCScaleTo::create(0.8f, 0.0f),
-                CCFadeOut::create(0.8f),
-                nullptr)
-            );
+            rachaSprite->runAction(CCSpawn::create(CCScaleTo::create(0.8f, 0.0f), CCFadeOut::create(0.8f), nullptr));
         }
-
-        if (auto newStreakSprite = static_cast<CCSprite*>(animLayer->getChildByTag(2))) {
+        if (auto newStreakSprite = animLayer->getChildByTag(2)) {
             newStreakSprite->runAction(CCFadeOut::create(0.5f));
         }
-        if (auto daysLabel = static_cast<CCLabelBMFont*>(animLayer->getChildByTag(3))) {
+        if (auto daysLabel = animLayer->getChildByTag(3)) {
             daysLabel->runAction(CCFadeOut::create(0.5f));
         }
-        if (auto aura = static_cast<CCSprite*>(animLayer->getChildByTag(4))) {
+        if (auto aura = animLayer->getChildByTag(4)) {
             aura->runAction(CCFadeOut::create(0.5f));
         }
-
-        // --- MODIFICACIÓN PARA MÓVILES ---
-#if !defined(GEODE_IS_MOBILE)
-        if (auto trail = static_cast<ManualParticleEmitter*>(animLayer->getChildByTag(5))) {
-            trail->stopEmitting();
-        }
-#endif
-
         if (auto shineBurst = static_cast<CCSprite*>(animLayer->getChildByTag(6))) {
             shineBurst->stopAllActions();
             shineBurst->runAction(CCFadeOut::create(0.5f));
         }
 
+        // Finalmente, eliminamos la capa de la animación de forma segura.
         animLayer->runAction(CCSequence::create(
             CCDelayTime::create(1.0f),
             CCRemoveSelf::create(),
