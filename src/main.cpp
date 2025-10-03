@@ -2821,12 +2821,13 @@ CCAction* createShakeAction(float duration, float strength) {
 
 
 
-// ============= POPUP PRINCIPAL (VERSIÓN FINAL SIN PARTÍCULAS) ==============
+
+// ============= POPUP PRINCIPAL (VERSIÓN FINAL, CORREGIDA Y SIMPLIFICADA) ==============
 class InfoPopup : public Popup<> {
 protected:
+    // --- FUNCIÓN DE CONFIGURACIÓN PRINCIPAL ---
     bool setup() override {
         g_streakData.dailyUpdate();
-
 
         this->setTitle("My Streak");
         auto winSize = m_mainLayer->getContentSize();
@@ -2835,26 +2836,13 @@ protected:
         auto spriteName = g_streakData.getRachaSprite();
         auto rachaSprite = CCSprite::create(spriteName.c_str());
         rachaSprite->setScale(0.4f);
-
-        auto rachaBtn = CCMenuItemSpriteExtra::create(
-            rachaSprite, this, menu_selector(InfoPopup::onRachaClick)
-        );
-
-        auto menuRacha = CCMenu::create();
-        menuRacha->addChild(rachaBtn);
+        auto rachaBtn = CCMenuItemSpriteExtra::create(rachaSprite, this, menu_selector(InfoPopup::onRachaClick));
+        auto menuRacha = CCMenu::createWithItem(rachaBtn);
         menuRacha->setPosition({ winSize.width / 2, centerY });
         m_mainLayer->addChild(menuRacha, 3);
+        rachaSprite->runAction(CCRepeatForever::create(CCSequence::create(CCMoveBy::create(1.5f, { 0, 8 }), CCMoveBy::create(1.5f, { 0, -8 }), nullptr)));
 
-        auto floatUp = CCMoveBy::create(1.5f, { 0, 8 });
-        auto floatDown = floatUp->reverse();
-        auto seq = CCSequence::create(floatUp, floatDown, nullptr);
-        auto repeat = CCRepeatForever::create(seq);
-        rachaSprite->runAction(repeat);
-
-        auto streakLabel = CCLabelBMFont::create(
-            ("Daily streak: " + std::to_string(g_streakData.currentStreak)).c_str(),
-            "goldFont.fnt"
-        );
+        auto streakLabel = CCLabelBMFont::create(("Daily streak: " + std::to_string(g_streakData.currentStreak)).c_str(), "goldFont.fnt");
         streakLabel->setScale(0.55f);
         streakLabel->setPosition({ winSize.width / 2, centerY - 60 });
         m_mainLayer->addChild(streakLabel);
@@ -2862,41 +2850,29 @@ protected:
         float barWidth = 140.0f;
         float barHeight = 16.0f;
         int requiredStars = g_streakData.getRequiredStars();
-        float percent = 0.f;
-        if (requiredStars > 0) {
-            percent = std::min(static_cast<float>(g_streakData.starsToday) / requiredStars, 1.0f);
-        }
+        float percent = requiredStars > 0 ? std::min(static_cast<float>(g_streakData.starsToday) / requiredStars, 1.0f) : 0.f;
 
-        auto barBg = CCLayerColor::create(ccc4(45, 45, 45, 255), barWidth, barHeight);
+        auto barBg = CCLayerColor::create({ 45, 45, 45, 255 }, barWidth, barHeight);
         barBg->setPosition({ winSize.width / 2 - barWidth / 2, centerY - 90 });
         m_mainLayer->addChild(barBg, 1);
-
-        auto barFg = CCLayerGradient::create(ccc4(250, 225, 60, 255), ccc4(255, 165, 0, 255));
+        auto barFg = CCLayerGradient::create({ 250, 225, 60, 255 }, { 255, 165, 0, 255 });
         barFg->setContentSize({ barWidth * percent, barHeight });
         barFg->setPosition({ winSize.width / 2 - barWidth / 2, centerY - 90 });
         m_mainLayer->addChild(barFg, 2);
 
-        auto border = CCLayerColor::create(ccc4(255, 255, 255, 255), barWidth + 2, barHeight + 2);
+        auto border = CCLayerColor::create({ 255, 255, 255, 120 }, barWidth + 2, barHeight + 2);
         border->setPosition({ winSize.width / 2 - barWidth / 2 - 1, centerY - 91 });
-        border->setZOrder(4);
-        border->setOpacity(120);
-        m_mainLayer->addChild(border);
-
-        auto outer = CCLayerColor::create(ccc4(0, 0, 0, 255), barWidth + 6, barHeight + 6);
+        m_mainLayer->addChild(border, 4);
+        auto outer = CCLayerColor::create({ 0, 0, 0, 70 }, barWidth + 6, barHeight + 6);
         outer->setPosition({ winSize.width / 2 - barWidth / 2 - 3, centerY - 93 });
-        outer->setZOrder(0);
-        outer->setOpacity(70);
-        m_mainLayer->addChild(outer);
+        m_mainLayer->addChild(outer, 0);
 
         auto starIcon = CCSprite::createWithSpriteFrameName("GJ_starsIcon_001.png");
         starIcon->setScale(0.45f);
         starIcon->setPosition({ winSize.width / 2 - 25, centerY - 82 });
         m_mainLayer->addChild(starIcon, 5);
 
-        auto barText = CCLabelBMFont::create(
-            (std::to_string(g_streakData.starsToday) + " / " + std::to_string(requiredStars)).c_str(),
-            "bigFont.fnt"
-        );
+        auto barText = CCLabelBMFont::create((std::to_string(g_streakData.starsToday) + " / " + std::to_string(requiredStars)).c_str(), "bigFont.fnt");
         barText->setScale(0.45f);
         barText->setPosition({ winSize.width / 2 + 15, centerY - 82 });
         m_mainLayer->addChild(barText, 5);
@@ -2907,61 +2883,46 @@ protected:
         rachaIndicator->setPosition({ winSize.width / 2 + barWidth / 2 + 20, centerY - 82 });
         m_mainLayer->addChild(rachaIndicator, 5);
 
+        // --- Botones ---
+        auto menuSide = CCMenu::create();
+        menuSide->setPosition(0, 0);
+        m_mainLayer->addChild(menuSide, 10);
+
         auto statsIcon = CCSprite::create("BtnStats.png"_spr);
-        if (statsIcon) {
-            statsIcon->setScale(0.7f);
-            auto statsBtn = CCMenuItemSpriteExtra::create(statsIcon, this, menu_selector(InfoPopup::onOpenStats));
-            auto statsMenu = CCMenu::create();
-            statsMenu->addChild(statsBtn);
-            statsMenu->setPosition({ winSize.width - 22, centerY });
-            m_mainLayer->addChild(statsMenu, 10);
-        }
+        statsIcon->setScale(0.7f);
+        auto statsBtn = CCMenuItemSpriteExtra::create(statsIcon, this, menu_selector(InfoPopup::onOpenStats));
+        statsBtn->setPosition({ winSize.width - 22, centerY });
+        menuSide->addChild(statsBtn);
 
         auto rewardsIcon = CCSprite::create("RewardsBtn.png"_spr);
-        if (rewardsIcon) {
-            rewardsIcon->setScale(0.7f);
-            auto rewardsBtn = CCMenuItemSpriteExtra::create(rewardsIcon, this, menu_selector(InfoPopup::onOpenRewards));
-            auto rewardsMenu = CCMenu::create();
-            rewardsMenu->addChild(rewardsBtn);
-            rewardsMenu->setPosition({ winSize.width - 22, centerY - 37 });
-            m_mainLayer->addChild(rewardsMenu, 10);
-        }
+        rewardsIcon->setScale(0.7f);
+        auto rewardsBtn = CCMenuItemSpriteExtra::create(rewardsIcon, this, menu_selector(InfoPopup::onOpenRewards));
+        rewardsBtn->setPosition({ winSize.width - 22, centerY - 37 });
+        menuSide->addChild(rewardsBtn);
 
         auto missionsIcon = CCSprite::create("super_star_btn.png"_spr);
-        if (missionsIcon) {
-            missionsIcon->setScale(0.7f);
-            auto missionsBtn = CCMenuItemSpriteExtra::create(missionsIcon, this, menu_selector(InfoPopup::onOpenMissions));
-            auto missionsMenu = CCMenu::create();
-            missionsMenu->addChild(missionsBtn);
-            missionsMenu->setPosition({ 22, centerY });
-            m_mainLayer->addChild(missionsMenu, 10);
-        }
+        missionsIcon->setScale(0.7f);
+        auto missionsBtn = CCMenuItemSpriteExtra::create(missionsIcon, this, menu_selector(InfoPopup::onOpenMissions));
+        missionsBtn->setPosition({ 22, centerY });
+        menuSide->addChild(missionsBtn);
 
         auto rouletteIcon = CCSprite::create("boton_ruleta.png"_spr);
-        if (rouletteIcon) {
-            rouletteIcon->setScale(0.7f);
-            auto rouletteBtn = CCMenuItemSpriteExtra::create(rouletteIcon, this, menu_selector(InfoPopup::onOpenRoulette));
-            auto rouletteMenu = CCMenu::create();
-            rouletteMenu->addChild(rouletteBtn);
-            rouletteMenu->setPosition({ 22, centerY - 37 });
-            m_mainLayer->addChild(rouletteMenu, 10);
-        }
+        rouletteIcon->setScale(0.7f);
+        auto rouletteBtn = CCMenuItemSpriteExtra::create(rouletteIcon, this, menu_selector(InfoPopup::onOpenRoulette));
+        rouletteBtn->setPosition({ 22, centerY - 37 });
+        menuSide->addChild(rouletteBtn);
 
         auto infoIcon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png");
         infoIcon->setScale(0.6f);
         auto infoBtn = CCMenuItemSpriteExtra::create(infoIcon, this, menu_selector(InfoPopup::onInfo));
-        auto menu = CCMenu::create();
-        menu->setPosition({ winSize.width - 20, winSize.height - 20 });
-        menu->addChild(infoBtn);
-        m_mainLayer->addChild(menu, 10);
+        infoBtn->setPosition({ winSize.width - 20, winSize.height - 20 });
+        menuSide->addChild(infoBtn);
 
         auto historyIcon = CCSprite::create("historial_btn.png"_spr);
         historyIcon->setScale(0.7f);
         auto historyBtn = CCMenuItemSpriteExtra::create(historyIcon, this, menu_selector(InfoPopup::onOpenHistory));
-        auto historyMenu = CCMenu::create();
-        historyMenu->addChild(historyBtn);
-        historyMenu->setPosition({ 20, 20 });
-        m_mainLayer->addChild(historyMenu, 10);
+        historyBtn->setPosition({ 20, 20 });
+        menuSide->addChild(historyBtn);
 
         if (g_streakData.shouldShowAnimation()) {
             this->showStreakAnimation(g_streakData.currentStreak);
@@ -2969,12 +2930,18 @@ protected:
         return true;
     }
 
+    // --- DECLARACIONES DE FUNCIONES ---
+    // Aquí es donde "anunciamos" que las funciones existen.
+    void showStreakAnimation(int streakLevel);
+    void onAnimationExit();
+
+    // --- FUNCIONES DE LOS BOTONES ---
     void onOpenHistory(CCObject*) { HistoryPopup::create()->show(); }
     void onOpenStats(CCObject*) { DayProgressPopup::create()->show(); }
     void onOpenRewards(CCObject*) { RewardsPopup::create()->show(); }
     void onRachaClick(CCObject*) { AllRachasPopup::create()->show(); }
     void onOpenMissions(CCObject*) { MissionsPopup::create()->show(); }
-
+    void onInfo(CCObject*) { FLAlertLayer::create("About Streak!", "Collect stars every day to increase your streak!\nIf you miss a day, your streak resets.", "OK")->show(); }
     void onOpenRoulette(CCObject*) {
         g_streakData.load();
         if (g_streakData.currentStreak < 1) {
@@ -2984,194 +2951,8 @@ protected:
         RoulettePopup::create()->show();
     }
 
-    void onInfo(CCObject*) {
-        FLAlertLayer::create(
-            "About Streak!",
-            "Collect 5+ stars every day to increase your streak!\n"
-            "If you miss a day (less than required), your streak resets.\n\n"
-            "Icons change depending on how many days you keep your streak.\n"
-            "Earn special awards for maintaining your streak!",
-            "OK"
-        )->show();
-    }
-
-    void showStreakAnimation(int streakLevel) {
-        auto winSize = CCDirector::sharedDirector()->getWinSize();
-        auto animLayer = CCLayer::create();
-        animLayer->setZOrder(1000);
-        animLayer->setTag(111);
-        this->addChild(animLayer);
-
-        auto bg = CCLayerColor::create(ccc4(0, 0, 0, 0));
-        bg->runAction(CCFadeTo::create(0.3f, 180));
-        animLayer->addChild(bg, 0);
-
-        auto shineBurst = CCSprite::createWithSpriteFrameName("shineBurst_001.png");
-        shineBurst->setPosition({ winSize.width / 2, winSize.height + 100.f });
-        shineBurst->setScale(0.1f);
-        shineBurst->setOpacity(0);
-        shineBurst->setTag(6);
-        shineBurst->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
-        shineBurst->setColor({ 255, 240, 180 });
-        animLayer->addChild(shineBurst, 2);
-
-        auto rachaSprite = CCSprite::create(g_streakData.getRachaSprite().c_str());
-        rachaSprite->setPosition({ winSize.width / 2, winSize.height + 100.f });
-        rachaSprite->setScale(0.1f);
-        rachaSprite->setRotation(-360.f);
-        rachaSprite->setTag(1);
-        animLayer->addChild(rachaSprite, 3);
-
-        auto aura = CCSprite::createWithSpriteFrameName("GJ_bigStar_001.png");
-        aura->setColor({ 255, 200, 100 });
-        aura->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
-        aura->setScale(0.0f);
-        aura->setOpacity(0);
-        aura->setTag(4);
-        aura->setPosition(rachaSprite->getPosition());
-        animLayer->addChild(aura, 1);
-
-        auto newStreakSprite = CCSprite::create("NewStreak.png"_spr);
-        newStreakSprite->setPosition({ winSize.width / 2, winSize.height / 2 + 80.f });
-        newStreakSprite->setScale(0.f);
-        newStreakSprite->setTag(2);
-        animLayer->addChild(newStreakSprite, 4);
-
-        auto daysLabel = CCLabelBMFont::create(CCString::createWithFormat("Day %d", streakLevel)->getCString(), "goldFont.fnt");
-        daysLabel->setPosition({ winSize.width / 2, winSize.height / 2 - 80.f });
-        daysLabel->setScale(0.5f);
-        daysLabel->setOpacity(0);
-        daysLabel->setTag(3);
-        animLayer->addChild(daysLabel, 5);
-
-        float entranceDuration = 0.8f;
-        auto entranceMove = CCEaseElasticOut::create(CCMoveTo::create(entranceDuration, { winSize.width / 2, winSize.height / 2 }), 0.5f);
-        auto entranceScale = CCEaseBackOut::create(CCScaleTo::create(entranceDuration, 1.2f));
-        auto entranceRotate = CCEaseExponentialOut::create(CCRotateTo::create(entranceDuration, 0.f));
-        auto auraMove = CCMoveTo::create(entranceDuration, { winSize.width / 2, winSize.height / 2 });
-        auto shineMove = CCMoveTo::create(entranceDuration, { winSize.width / 2, winSize.height / 2 });
-
-        aura->runAction(auraMove);
-
-        shineBurst->runAction(CCSequence::create(
-            CCSpawn::create(shineMove, CCFadeIn::create(entranceDuration * 0.5f), CCScaleTo::create(entranceDuration, 6.2f), nullptr),
-            CCCallFunc::create(this, callfunc_selector(InfoPopup::startShineRotation)),
-            nullptr
-        ));
-
-        FMODAudioEngine::sharedEngine()->playEffect("achievement.mp3"_spr, 1.0f, 1.0f, 0.6f);
-
-        rachaSprite->runAction(CCSequence::create(
-            CCSpawn::create(entranceMove, entranceScale, entranceRotate, nullptr),
-            CCCallFunc::create(this, callfunc_selector(InfoPopup::onAnimationImpact)),
-            nullptr
-        ));
-    }
-
-    void startShineRotation() {
-        auto animLayer = this->getChildByTag(111);
-        if (!animLayer) return;
-        if (auto shineBurst = static_cast<CCSprite*>(animLayer->getChildByTag(6))) {
-            auto rotate = CCRotateBy::create(8.0f, 360);
-            shineBurst->runAction(CCRepeatForever::create(rotate));
-            shineBurst->setOpacity(150);
-        }
-    }
-
-    void onAnimationImpact() {
-        auto winSize = CCDirector::sharedDirector()->getWinSize();
-        auto animLayer = this->getChildByTag(111);
-        if (!animLayer) return;
-
-        animLayer->runAction(createShakeAction(0.2f, 5.0f));
-
-        auto shockwave = CCSprite::createWithSpriteFrameName("d_practiceIcon_001.png");
-        shockwave->setPosition({ winSize.width / 2, winSize.height / 2 });
-        shockwave->setColor({ 255, 225, 150 });
-        shockwave->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
-        shockwave->setScale(0.2f);
-        shockwave->runAction(CCSequence::create(
-            CCSpawn::create(CCScaleTo::create(0.5f, 5.0f), CCFadeOut::create(0.5f), nullptr),
-            CCRemoveSelf::create(),
-            nullptr
-        ));
-        animLayer->addChild(shockwave, 1);
-
-        auto flash = CCSprite::createWithSpriteFrameName("GJ_bigStar_001.png");
-        flash->setPosition({ winSize.width / 2, winSize.height / 2 });
-        flash->setScale(4.0f);
-        flash->setColor({ 255, 255, 150 });
-        flash->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
-        flash->runAction(CCSequence::create(CCFadeIn::create(0.1f), CCFadeOut::create(0.3f), CCRemoveSelf::create(), nullptr));
-        animLayer->addChild(flash, 3);
-
-        FMODAudioEngine::sharedEngine()->playEffect("mcsfx.mp3"_spr);
-
-        if (auto rachaSprite = static_cast<CCSprite*>(animLayer->getChildByTag(1))) {
-            rachaSprite->runAction(CCEaseBackOut::create(CCScaleTo::create(0.3f, 1.0f)));
-            auto breatheIn = CCScaleTo::create(1.5f, 1.05f);
-            auto breatheOut = CCScaleTo::create(1.5f, 1.0f);
-            rachaSprite->runAction(CCRepeatForever::create(CCSequence::create(breatheIn, breatheOut, nullptr)));
-        }
-
-        if (auto aura = static_cast<CCSprite*>(animLayer->getChildByTag(4))) {
-            aura->runAction(CCSequence::create(
-                CCSpawn::create(CCFadeTo::create(0.4f, 150), CCScaleTo::create(0.4f, 1.5f), nullptr),
-                CCFadeOut::create(0.3f),
-                nullptr
-            ));
-        }
-
-        if (auto newStreakSprite = static_cast<CCSprite*>(animLayer->getChildByTag(2))) {
-            newStreakSprite->runAction(CCSequence::create(CCDelayTime::create(0.2f), CCEaseBackOut::create(CCScaleTo::create(0.4f, 1.0f)), nullptr));
-        }
-        if (auto daysLabel = static_cast<CCLabelBMFont*>(animLayer->getChildByTag(3))) {
-            daysLabel->runAction(CCSequence::create(CCDelayTime::create(0.4f), CCSpawn::create(CCFadeIn::create(0.5f), CCEaseBackOut::create(CCScaleTo::create(0.5f, 1.0f)), nullptr), nullptr));
-        }
-
-        animLayer->runAction(CCSequence::create(
-            CCDelayTime::create(3.0f), // Duración de la animación sin partículas
-            CCCallFunc::create(this, callfunc_selector(InfoPopup::onAnimationExit)),
-            nullptr
-        ));
-    }
-
-    void onAnimationExit() {
-        auto animLayer = this->getChildByTag(111);
-        
-        if (!animLayer) return;
-
-        // Verificamos CADA objeto antes de intentar animarlo.
-        if (auto bg = animLayer->getChildByTag(0)) {
-            bg->runAction(CCFadeOut::create(1.0f));
-        }
-        if (auto rachaSprite = static_cast<CCSprite*>(animLayer->getChildByTag(1))) {
-            rachaSprite->stopAllActions();
-            rachaSprite->runAction(CCSpawn::create(CCScaleTo::create(0.8f, 0.0f), CCFadeOut::create(0.8f), nullptr));
-        }
-        if (auto newStreakSprite = animLayer->getChildByTag(2)) {
-            newStreakSprite->runAction(CCFadeOut::create(0.5f));
-        }
-        if (auto daysLabel = animLayer->getChildByTag(3)) {
-            daysLabel->runAction(CCFadeOut::create(0.5f));
-        }
-        if (auto aura = animLayer->getChildByTag(4)) {
-            aura->runAction(CCFadeOut::create(0.5f));
-        }
-        if (auto shineBurst = static_cast<CCSprite*>(animLayer->getChildByTag(6))) {
-            shineBurst->stopAllActions();
-            shineBurst->runAction(CCFadeOut::create(0.5f));
-        }
-
-        // Finalmente, eliminamos la capa de la animación de forma segura.
-        animLayer->runAction(CCSequence::create(
-            CCDelayTime::create(1.0f),
-            CCRemoveSelf::create(),
-            nullptr
-        ));
-    }
-
 public:
+    // --- FUNCIÓN CREATE (no cambia) ---
     static InfoPopup* create() {
         auto ret = new InfoPopup();
         if (ret && ret->initAnchored(260.f, 220.f)) {
@@ -3182,6 +2963,69 @@ public:
         return nullptr;
     }
 };
+
+// --- DEFINICIONES DE LAS FUNCIONES DE ANIMACIÓN ---
+// (Estas van FUERA de la clase, como ya las tenías)
+
+void InfoPopup::showStreakAnimation(int streakLevel) {
+    auto winSize = CCDirector::sharedDirector()->getWinSize();
+
+    auto animLayer = CCLayer::create();
+    animLayer->setTag(111);
+    this->addChild(animLayer, 1000);
+
+    auto bg = CCLayerColor::create({ 0, 0, 0, 180 });
+    bg->setOpacity(0);
+    bg->runAction(CCFadeTo::create(0.3f, 180));
+    animLayer->addChild(bg);
+
+    auto rachaSprite = CCSprite::create(g_streakData.getRachaSprite().c_str());
+    rachaSprite->setPosition(winSize / 2);
+    rachaSprite->setScale(0.1f);
+    rachaSprite->setOpacity(0);
+    animLayer->addChild(rachaSprite);
+
+    auto daysLabel = CCLabelBMFont::create(CCString::createWithFormat("Day %d!", streakLevel)->getCString(), "goldFont.fnt");
+    daysLabel->setPosition({ winSize.width / 2, winSize.height / 2 - 80.f });
+    daysLabel->setScale(0.1f);
+    daysLabel->setOpacity(0);
+    animLayer->addChild(daysLabel);
+
+    FMODAudioEngine::sharedEngine()->playEffect("achievement.mp3"_spr);
+
+    rachaSprite->runAction(CCSpawn::create(
+        CCFadeIn::create(0.4f),
+        CCEaseBackOut::create(CCScaleTo::create(0.4f, 1.0f)),
+        nullptr
+    ));
+
+    daysLabel->runAction(CCSequence::create(
+        CCDelayTime::create(0.2f),
+        CCSpawn::create(
+            CCFadeIn::create(0.4f),
+            CCEaseBackOut::create(CCScaleTo::create(0.4f, 1.0f)),
+            nullptr
+        ),
+        nullptr
+    ));
+
+    animLayer->runAction(CCSequence::create(
+        CCDelayTime::create(2.5f),
+        CCCallFunc::create(this, callfunc_selector(InfoPopup::onAnimationExit)),
+        nullptr
+    ));
+}
+
+void InfoPopup::onAnimationExit() {
+    auto animLayer = this->getChildByTag(111);
+    if (!animLayer) return;
+
+    animLayer->runAction(CCSequence::create(
+        CCFadeOut::create(0.5f),
+        CCRemoveSelf::create(),
+        nullptr
+    ));
+}
 
 class $modify(MyMenuLayer, MenuLayer) {
     struct Fields {
