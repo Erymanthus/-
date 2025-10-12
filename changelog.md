@@ -1,4 +1,4 @@
-# 1.7.5 Bye bye Stars
+# 1.7.7 Bye bye Stars
 - New scoring system
 - Added total streak points to profile stats
 - fix bugs
