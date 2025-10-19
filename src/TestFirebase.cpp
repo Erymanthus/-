@@ -4,6 +4,9 @@
 #include <Geode/binding/GJAccountManager.hpp>
 #include "StreakData.h"
 
+
+
+
 void updatePlayerDataInFirebase() {
     log::info("--- STARTING DATA UPDATE ---");
     auto accountManager = GJAccountManager::sharedState();
@@ -18,6 +21,7 @@ void updatePlayerDataInFirebase() {
 
     playerData.set("username", std::string(accountManager->m_username));
     playerData.set("accountID", accountID);
+   
     playerData.set("current_streak_days", g_streakData.currentStreak);
     playerData.set("total_streak_points", g_streakData.totalStreakPoints);
     playerData.set("equipped_badge_id", g_streakData.equippedBadge);
@@ -28,19 +32,13 @@ void updatePlayerDataInFirebase() {
     playerData.set("last_day", g_streakData.lastDay);
     playerData.set("streakPointsToday", g_streakData.streakPointsToday);
 
-    // Asegurar que unlockedBadges esté inicializado
-    g_streakData.initializeUnlockedBadges();
-
     std::vector<std::string> unlocked_badges_vec;
     for (size_t i = 0; i < g_streakData.badges.size(); ++i) {
-        if (i < g_streakData.unlockedBadges.size() && g_streakData.unlockedBadges[i]) {
+        if (!g_streakData.unlockedBadges.empty() && i < g_streakData.unlockedBadges.size() && g_streakData.unlockedBadges[i]) {
             unlocked_badges_vec.push_back(g_streakData.badges[i].badgeID);
-            log::info("Including badge in update: {}", g_streakData.badges[i].badgeID);
         }
     }
     playerData.set("unlocked_badges", unlocked_badges_vec);
-
-    log::info("Unlocked badges count: {}", unlocked_badges_vec.size());
 
     matjson::Value missions_obj = matjson::Value::object();
     missions_obj.set("pm1", g_streakData.pointMission1Claimed);
@@ -72,6 +70,7 @@ void updatePlayerDataInFirebase() {
         accountID
     );
 
+   
     static EventListener<web::WebTask> s_updateListener;
     s_updateListener.bind([](web::WebTask::Event* e) {
         if (web::WebResponse* res = e->getValue()) {

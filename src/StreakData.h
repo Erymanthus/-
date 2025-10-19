@@ -30,7 +30,7 @@ struct StreakData {
     bool pointMission4Claimed;
     bool pointMission5Claimed;
     bool pointMission6Claimed;
-    bool isDataLoaded;
+    bool isDataLoaded; 
     bool m_initialized = false;
 
     enum class BadgeCategory {
@@ -57,6 +57,9 @@ struct StreakData {
         {300, "reward300.png"_spr, "300 Days!!!", BadgeCategory::LEGENDARY, "badge_300", false},
         {365, "reward1year.png"_spr, "1 Year!!!", BadgeCategory::MYTHIC, "badge_365", false},
 
+
+
+
         {0, "badge_beta.png"_spr, "Player beta?", BadgeCategory::COMMON, "beta_badge", true},
         {0, "badge_platino.png"_spr, "platino badge", BadgeCategory::COMMON, "platino_streak_badge", true},
         {0, "badge_diamante_gd.png"_spr, "GD Diamond!", BadgeCategory::COMMON, "diamante_gd_badge", true},
@@ -77,13 +80,7 @@ struct StreakData {
         return m_initialized && isDataLoaded;
     }
 
-    // Añade un método para inicializar unlockedBadges
-    void initializeUnlockedBadges() {
-        if (unlockedBadges.empty()) {
-            unlockedBadges.assign(badges.size(), false);
-        }
-    }
-
+    
     void parseServerResponse(const matjson::Value& data);
     void resetToDefault();
     void load();

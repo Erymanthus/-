@@ -736,11 +736,13 @@ protected:
                     errorMsg = res->json().unwrap()["error"].as<std::string>().unwrapOr("Invalid request.");
                 }
                 FLAlertLayer::create("Error", errorMsg.c_str(), "OK")->show();
+                this->onClose(nullptr);
             }
         }
         else if (e->isCancelled()) {
             log::error("[Streak!]: Connection Error or task cancelled.");
             FLAlertLayer::create("Error", "Could not connect to the server.", "OK")->show();
+            this->onClose(nullptr);
         }
     }
 

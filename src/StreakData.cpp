@@ -2,6 +2,8 @@
 #include "FirebaseManager.h" 
 StreakData g_streakData;
 
+
+
 void StreakData::resetToDefault() {
     currentStreak = 0;
     streakPointsToday = 0;
@@ -21,20 +23,25 @@ void StreakData::resetToDefault() {
     pointMission4Claimed = false;
     pointMission5Claimed = false;
     pointMission6Claimed = false;
-
-    // Inicializar unlockedBadges
-    initializeUnlockedBadges();
-
-    isDataLoaded = false;
+    unlockedBadges.assign(badges.size(), false);
+    isDataLoaded = false; 
 }
+
+
+
 
 void StreakData::load() {
-    // Implementación existente
+ 
 }
 
+
 void StreakData::save() {
+   
     updatePlayerDataInFirebase();
 }
+
+
+
 
 void StreakData::parseServerResponse(const matjson::Value& data) {
     currentStreak = data["current_streak_days"].as<int>().unwrapOr(0);
@@ -47,22 +54,18 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
     lastDay = data["last_day"].as<std::string>().unwrapOr("");
     streakPointsToday = data["streakPointsToday"].as<int>().unwrapOr(0);
 
-    // Inicializar unlockedBadges antes de procesar
-    initializeUnlockedBadges();
-
-    // Procesar insignias desbloqueadas
+   
+    unlockedBadges.assign(badges.size(), false);
     if (data.contains("unlocked_badges")) {
         auto badgesResult = data["unlocked_badges"].as<std::vector<matjson::Value>>();
         if (badgesResult.isOk()) {
             for (const auto& badge_id_json : badgesResult.unwrap()) {
-                std::string badgeID = badge_id_json.as<std::string>().unwrapOr("");
-                if (!badgeID.empty()) {
-                    unlockBadge(badgeID);
-                }
+                unlockBadge(badge_id_json.as<std::string>().unwrapOr(""));
             }
         }
     }
 
+   
     pointMission1Claimed = false;
     pointMission2Claimed = false;
     pointMission3Claimed = false;
@@ -82,11 +85,14 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
         }
     }
 
-    streakPointsHistory.clear();
+    
+    streakPointsHistory.clear(); 
     if (data.contains("history")) {
+       
         auto historyResult = data["history"].as<std::map<std::string, matjson::Value>>();
         if (historyResult.isOk()) {
             auto historyMap = historyResult.unwrap();
+          
             for (const auto& [date, pointsValue] : historyMap) {
                 streakPointsHistory[date] = pointsValue.as<int>().unwrapOr(0);
             }
@@ -95,7 +101,10 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
             log::warn("No se pudo leer 'history' como un objeto desde el servidor.");
         }
     }
+   
 }
+
+
 
 int StreakData::getRequiredPoints() {
     if (currentStreak >= 80) return 10;
@@ -122,24 +131,15 @@ int StreakData::getTicketValueForRarity(BadgeCategory category) {
 }
 
 void StreakData::unlockBadge(const std::string& badgeID) {
-    // Asegurarse de que unlockedBadges tenga el tamaño correcto
-    if (unlockedBadges.empty() || unlockedBadges.size() != badges.size()) {
-        unlockedBadges.assign(badges.size(), false);
-    }
-
     for (size_t i = 0; i < badges.size(); ++i) {
         if (badges[i].badgeID == badgeID) {
-            if (i < unlockedBadges.size()) {
-                unlockedBadges[i] = true;
-                log::info("Badge unlocked: {} at index {}", badgeID, i);
+            if (unlockedBadges.empty() || unlockedBadges.size() != badges.size()) {
+                unlockedBadges.assign(badges.size(), false);
             }
-            else {
-                log::error("Index out of bounds when unlocking badge: {}", badgeID);
-            }
+            if (i < unlockedBadges.size()) unlockedBadges[i] = true;
             return;
         }
     }
-    log::warn("Badge ID not found: {}", badgeID);
 }
 
 std::string StreakData::getCurrentDate() {
@@ -152,7 +152,7 @@ std::string StreakData::getCurrentDate() {
 
 void StreakData::unequipBadge() {
     equippedBadge = "";
-    save();
+    save(); 
 }
 
 bool StreakData::isBadgeEquipped(const std::string& badgeID) {
@@ -177,7 +177,7 @@ void StreakData::dailyUpdate() {
     double days_passed = floor(seconds_passed / (60.0 * 60.0 * 24.0));
 
     bool streak_should_be_lost = false;
-    bool showAlert = false;
+    bool showAlert = false; 
 
     if (days_passed >= 2.0) {
         streak_should_be_lost = true;
@@ -193,8 +193,8 @@ void StreakData::dailyUpdate() {
             currentStreak = 0;
             streakPointsHistory.clear();
             totalStreakPoints = 0;
-            showAlert = true;
-            updatePlayerDataInFirebase();
+            showAlert = true; 
+            updatePlayerDataInFirebase(); 
         }
     }
 
@@ -210,7 +210,7 @@ void StreakData::dailyUpdate() {
         pointMission6Claimed = false;
 
         if (!streak_should_be_lost) {
-            updatePlayerDataInFirebase();
+            updatePlayerDataInFirebase(); 
         }
     }
 
@@ -234,7 +234,7 @@ void StreakData::checkRewards() {
 }
 
 void StreakData::addPoints(int count) {
-    dailyUpdate();
+    dailyUpdate(); 
     int currentRequired = getRequiredPoints();
     bool alreadyGotRacha = (streakPointsToday >= currentRequired);
     streakPointsToday += count;
@@ -245,9 +245,9 @@ void StreakData::addPoints(int count) {
     if (!alreadyGotRacha && streakPointsToday >= currentRequired) {
         currentStreak++;
         hasNewStreak = true;
-        checkRewards();
+        checkRewards(); 
     }
-    save();
+    save(); 
 }
 
 bool StreakData::shouldShowAnimation() {
@@ -304,6 +304,7 @@ StreakData::BadgeInfo* StreakData::getBadgeInfo(const std::string& badgeID) {
 bool StreakData::isBadgeUnlocked(const std::string& badgeID) {
     for (size_t i = 0; i < badges.size(); i++) {
         if (badges[i].badgeID == badgeID) {
+          
             if (!unlockedBadges.empty() && i < unlockedBadges.size()) return unlockedBadges[i];
         }
     }
