@@ -15,6 +15,8 @@
 #include <Geode/loader/Event.hpp>
 #include <matjson.hpp>
 #include <Geode/utils/cocos.hpp>
+#include <Geode/modify/OptionsLayer.hpp>
+
 
 class $modify(MyPlayLayer, PlayLayer) {
     void levelComplete() {
@@ -105,76 +107,85 @@ class $modify(MyMenuLayer, MenuLayer) {
         menu->updateLayout();
     }
 
+  
+
     void loadPlayerData() {
         auto accountManager = GJAccountManager::sharedState();
-        if (accountManager->m_accountID == 0) {
-            log::info("Player not logged in. Resetting streak data.");
-            g_streakData.resetToDefault();
 
-            
-            g_streakData.dailyUpdate();
-            
-
+        log::info("Resetting local g_streakData before loading...");
+        g_streakData.resetToDefault();
+      
+       
+        if (!accountManager || accountManager->m_accountID == 0) {
+            log::info("Player not logged in or accountManager is null. Using default data.");
             g_streakData.m_initialized = true;
             g_streakData.isDataLoaded = true;
-            this->createFinalButton();
+            
+            g_streakData.dailyUpdate();
+            this->createFinalButton(); 
             return;
         }
 
-       
+      
         m_fields->m_playerDataListener.bind([this](web::WebTask::Event* e) {
+           
+            bool loadSuccess = false; 
 
             if (web::WebResponse* res = e->getValue()) {
-                bool loadSuccess = false; 
-
-                
+              
                 if (res->ok() && res->json().isOk()) {
                     log::info("Player data found, parsing response.");
+                   
                     g_streakData.parseServerResponse(res->json().unwrap());
                     loadSuccess = true;
                 }
-               
+              
                 else if (res->code() == 404) {
-                    log::info("New player detected. Creating profile.");
-                    g_streakData.resetToDefault();
-                 
-                    g_streakData.dailyUpdate();
+                    log::info("New player detected. Creating profile on server.");
                   
+                    g_streakData.dailyUpdate();
                     updatePlayerDataInFirebase(); 
                     loadSuccess = true; 
                 }
-               
+              
                 else {
                     log::error("Failed to load player data. Response code: {}", res->code());
-                   
+                  
                 }
 
-                
+               
                 if (loadSuccess) {
                     log::info("Calling dailyUpdate after successful data load/init.");
-                    g_streakData.dailyUpdate(); 
+                   
+                    
+                    g_streakData.dailyUpdate();
+                    
                     g_streakData.m_initialized = true;
                     g_streakData.isDataLoaded = true;
+                  
                     this->createFinalButton();
                 }
                 else {
-                 
+           
                     this->createErrorButton();
                 }
               
 
             }
             else if (e->isCancelled()) {
-                log::error("Player data request cancelled or timed out.");
+             
+                log::error("Player data request cancelled or network failed.");
                 this->createErrorButton();
                
             }
             });
 
-       
+      
         std::string url = fmt::format("https://streak-servidor.onrender.com/players/{}", accountManager->m_accountID);
         auto req = web::WebRequest();
+       
         m_fields->m_playerDataListener.setFilter(req.get(url));
+        log::info("Sent request to load player data for account {}", accountManager->m_accountID);
     }
 
     void createFinalButton() {

@@ -8,7 +8,7 @@
 	},
 	"id": "jotabelike.gd_racha",
 	"name": "Streak!",
-	"version": "v1.8.2-beta",
+	"version": "v1.8.5-beta",
 	"developer": "XJotabelikeX",
 	"description": "Personal Streak! Prove you're the best and start a streak!",
 	"links": {
@@ -37,13 +37,16 @@
 	],
 	"resources": {
 		"files": [
-			"resources/audio/*.mp3",
-			"resources/streak_trail.plist"
+			"resources/audio/*.mp3"
+			
 		],
 
 
 		"sprites": [
-			"resources/*.png"
+			"resources/badges/*.png",
+			"resources/streaks/*.png",
+			"resources/buttons/*.png",
+			"resources/extra/*.png"
 
 		]
 

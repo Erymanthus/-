@@ -1,3 +1,17 @@
+# 1.8.5 New Style And Badges
+- More badges were added
+- New design in the main menu
+- new challenge interface
+- new global top (BETA)
+- New code redemption interface
+
+# 1.8.5 (Spanish) Nuevo estilo e insignias
+- Se agregaron mas insignias
+- Nuevo estilo del menu principal
+- Nueva interfaz de desafios
+- Nuevo top global (BETA)
+- Nueva interfaz de canje de codigos
+
 # 1.7.9 Online Mode 
 - online mode was added
 

@@ -9,6 +9,33 @@
 #include <Geode/cocos/extensions/cocos-ext.h>
 #include <Geode/ui/TextInput.hpp>
 
+
+#include <Geode/binding/GameLevelManager.hpp> // Necesario para verificar niveles completados
+#include <Geode/binding/GJGameLevel.hpp>     // Necesario para GJGameLevel
+#include <Geode/binding/CreatorLayer.hpp>
+#include <Geode/binding/GameManager.hpp>
+#include <Geode/utils/cocos.hpp> // For log::error if sprite fails
+#include <Geode/binding/DailyLevelPage.hpp> // <-- Necesario para DailyLevelPage
+#include <cocos2d.h>
+#include <cocos-ext.h>
+#include <fmt/format.h> // For fmt::format
+#include <Geode/utils/web.hpp>
+#include <Geode/binding/TextArea.hpp>
+#include <Geode/binding/ProfilePage.hpp> // Necesario para ver el perfil
+#include <Geode/Result.hpp> // Para value_or
+#include <variant> // Necesario para std::holds_alternative
+
+
+
+
+#include <map>    // Necesario para std::map
+
+#include <exception>
+#include <vector>
+#include <string>
+#include <cmath>
+#include <algorithm>
+
 class ShopPopup;
 
 
@@ -84,6 +111,9 @@ public:
         return nullptr;
     }
 };
+
+
+
 
 class HistoryPopup : public Popup<> {
 protected:
@@ -288,6 +318,226 @@ public:
         return nullptr;
     }
 };
+
+
+
+// --- Definiciones de Misiones de Nivel (PONER ANTES de LevelProgressPopup) ---
+enum class LevelRewardType {
+    None, Badge, SuperStars, StarTickets
+};
+
+struct LevelMission {
+    int levelID;
+    std::string levelName;
+    std::string rewardBadgeID;              // Insignia principal
+    LevelRewardType secondaryRewardType;    // Tipo extra
+    int secondaryRewardQuantity;          // Cantidad extra
+    std::string secondaryRewardSprite;      // Sprite extra
+    std::string secondaryRewardDisplayName; // Nombre extra
+};
+
+
+std::vector<LevelMission> g_levelMissions = {
+   
+    {44062068,  "Future Funk",         "dual_badge",    LevelRewardType::StarTickets,  25,     "star_tiket.png"_spr,    "+25 Tickets"},
+    {34085027,  "B",                   "b_badge",       LevelRewardType::None,          0,     "",                      ""},
+    {125070012, "The Towerverse II",   "ttv_badge",     LevelRewardType::SuperStars,    5,     "super_star.png"_spr,    "+5 Super Stars"},
+    {90475473,  "Change of Scene",     "cos_badge",     LevelRewardType::None,          0,     "",                      ""},
+    {89886591,  "iSpyWithMyLittleEye", "spy_badge",     LevelRewardType::StarTickets,  50,      "star_tiket.png"_spr,   "+50 Tickets"},
+    {56210242,  "Shiver",              "shiver_badge",  LevelRewardType::SuperStars,    3,      "super_star.png"_spr,   "+3 Super Stars"},
+    {58270823,  "Nantendo",            "nantendo_badge",LevelRewardType::StarTickets,  100,     "star_tiket.png"_spr,   "+100 Star tickets"},
+	{126094460, "Funhouse",            "funhouse_badge",LevelRewardType::SuperStars,    10,     "super_star.png"_spr,   "+10 Super Stars"},
+    {114832829, "Miku Party",          "miku_badge",    LevelRewardType::SuperStars,    15,     "super_star.png"_spr,   "+15 Super Stars"},
+	{96978035,  "Oxidize",             "cobre_badge",   LevelRewardType::SuperStars,   10,     "super_star.png"_spr,   "+10 Super Stars"},
+    {103032383,  "Koi no uta",         "tsukasa_badge", LevelRewardType::StarTickets,   120,    "star_tiket.png"_spr,"+120 Star Tickets"}
+};
+class LevelProgressPopup; 
+
+
+
+class LevelProgressPopup : public Popup<> {
+protected:
+    CCLayer* m_listContainer = nullptr; 
+    CCMenuItemSpriteExtra* m_leftArrow = nullptr;
+    CCMenuItemSpriteExtra* m_rightArrow = nullptr;
+    int m_currentPage = 0;
+    int m_totalPages = 0;
+    const int m_itemsPerPage = 3; 
+
+    CCNode* createLevelMissionNode(const LevelMission& mission) {
+        // Comprobación de completado (usando m_normalPercent)
+        GJGameLevel* level = GameLevelManager::sharedState()->getSavedLevel(mission.levelID);
+        bool isComplete = (level != nullptr) && (level->m_normalPercent >= 100);
+        bool isMissionClaimed = g_streakData.isLevelMissionClaimed(mission.levelID);
+        bool isBadgeUnlocked = g_streakData.isBadgeUnlocked(mission.rewardBadgeID);
+
+        // Contenedor principal
+        auto container = cocos2d::extension::CCScale9Sprite::create("GJ_square01.png");
+        container->setContentSize({ 280.f, 45.f });
+
+        // Info Insignia Principal para Color
+        auto badgeInfo = g_streakData.getBadgeInfo(mission.rewardBadgeID);
+        ccColor3B titleColor = badgeInfo ? g_streakData.getCategoryColor(badgeInfo->category) : ccColor3B{ 255, 255, 255 };
+
+        // Nombre Nivel (con color y más grande)
+        auto nameLabel = CCLabelBMFont::create(mission.levelName.c_str(), "goldFont.fnt");
+        
+        nameLabel->limitLabelWidth(150.f, 0.5f, 0.1f); 
+        nameLabel->setAnchorPoint({ 0, 0.5f });
+        nameLabel->setPosition({ 15.f, 26.f });
+        nameLabel->setColor(titleColor); 
+        container->addChild(nameLabel);
+
+        // ID Nivel (sin cambios)
+        auto idLabel = CCLabelBMFont::create(fmt::format("ID: {}", mission.levelID).c_str(), "chatFont.fnt");
+        idLabel->setScale(0.5f); idLabel->setAnchorPoint({ 0, 0.5f }); idLabel->setPosition({ 15.f, 12.f }); idLabel->setColor({ 180, 180, 180 }); container->addChild(idLabel);
+
+        // Mostrar Recompensas (sin cambios)
+        float rewardAreaX = 185.f; float rewardSpacing = 35.f; CCSprite* primaryRewardSprite = nullptr;
+        if (badgeInfo) { primaryRewardSprite = CCSprite::create(badgeInfo->spriteName.c_str()); if (primaryRewardSprite) { primaryRewardSprite->setScale(0.18f); primaryRewardSprite->setPosition({ rewardAreaX, 22.5f }); container->addChild(primaryRewardSprite); } }
+        if (mission.secondaryRewardType != LevelRewardType::None) { if (primaryRewardSprite) primaryRewardSprite->setPositionX(rewardAreaX - rewardSpacing / 2); CCSprite* secondaryRewardSprite = CCSprite::create(mission.secondaryRewardSprite.c_str()); if (secondaryRewardSprite) { secondaryRewardSprite->setScale(0.18f); secondaryRewardSprite->setPosition({ rewardAreaX + rewardSpacing / 2, 22.5f }); container->addChild(secondaryRewardSprite); auto amountLabel = CCLabelBMFont::create(fmt::format("x{}", mission.secondaryRewardQuantity).c_str(), "goldFont.fnt"); amountLabel->setScale(0.35f); amountLabel->setAnchorPoint({ 0, 0.5f }); amountLabel->setPosition({ secondaryRewardSprite->getPositionX() + secondaryRewardSprite->getScaledContentSize().width * 0.5f + 3.f, 22.5f }); container->addChild(amountLabel); } }
+        auto rewardLabel = CCLabelBMFont::create("Reward(s)", "chatFont.fnt"); rewardLabel->setScale(0.4f); rewardLabel->setPosition({ rewardAreaX, 38.f }); container->addChild(rewardLabel);
+
+       
+        if (isMissionClaimed) {
+            auto checkmark = CCSprite::createWithSpriteFrameName("GJ_completesIcon_001.png"); checkmark->setScale(0.6f); checkmark->setPosition({ 255.f, 22.5f }); container->addChild(checkmark);
+            container->setOpacity(150); CCObject* child = nullptr; CCARRAY_FOREACH(container->getChildren(), child) { if (!child) continue; if (auto rgba = dynamic_cast<CCRGBAProtocol*>(child)) { if (dynamic_cast<CCSprite*>(child) != checkmark) { rgba->setOpacity(150); } } }
+        }
+        else if (isComplete) {
+            auto claimBtnSprite = ButtonSprite::create("Claim"); claimBtnSprite->setScale(0.7f);
+            auto claimBtn = CCMenuItemSpriteExtra::create(claimBtnSprite, this, menu_selector(LevelProgressPopup::onClaimMission));
+            claimBtn->setTag(mission.levelID); claimBtn->setPosition({ 255.f - claimBtnSprite->getScaledContentSize().width / 2, 22.5f });
+            auto menu = CCMenu::createWithItem(claimBtn); menu->setPosition(0, 0); container->addChild(menu); container->setOpacity(255);
+        }
+        else {
+            container->setOpacity(255);
+        }
+
+        return container;
+    }
+
+  
+    void updatePage() {
+        if (!m_listContainer) return;
+        m_listContainer->removeAllChildrenWithCleanup(true);
+
+        int startIndex = m_currentPage * m_itemsPerPage;
+        float containerHeight = m_listContainer->getContentSize().height;
+        float containerWidth = m_listContainer->getContentSize().width;
+        float totalItemsHeight = (m_itemsPerPage * 45.f) + ((m_itemsPerPage - 1) * 5.f);
+        float topY = containerHeight / 2 + totalItemsHeight / 2 - 45.f / 2;
+        float spacing = 50.f;
+
+        for (int i = 0; i < m_itemsPerPage; ++i) {
+            int missionIndex = startIndex + i;
+            if (missionIndex < g_levelMissions.size()) {
+                if (auto missionNode = createLevelMissionNode(g_levelMissions[missionIndex])) {
+                    missionNode->setPosition(containerWidth / 2, topY - (i * spacing));
+                    m_listContainer->addChild(missionNode);
+                }
+            }
+        }
+
+        if (m_leftArrow) m_leftArrow->setVisible(m_currentPage > 0);
+        if (m_rightArrow) m_rightArrow->setVisible(m_currentPage < m_totalPages - 1);
+    }
+
+   
+    void onSwitchPage(CCObject* sender) {
+        int direction = sender->getTag();
+        int nextPage = m_currentPage + direction;
+        if (nextPage >= 0 && nextPage < m_totalPages) {
+            m_currentPage = nextPage;
+            updatePage();
+        }
+    }
+
+  
+    void onMissionInfo(CCObject*) {
+        std::string message =
+            "<cy>How Level Challenges Work:</c>\n\n"
+            "You must complete the specified level in <cg>Normal Mode</c>.\n\n"
+            "<cr>Important:</c> If you completed the level <co>before</c> installing the mod, you might need to <cl>re-complete it</c> for the challenge to register.\n\n"
+            "Once completed, press the <cb>Claim</c> button (if available) to receive your rewards!";
+        FLAlertLayer::create("Level Challenge Info", message, "OK")->show();
+    }
+
+
+   
+    void onClaimMission(CCObject* sender) {
+        int levelID = sender->getTag();
+        log::info("Attempting to claim reward for level ID: {}", levelID);
+
+        const LevelMission* missionPtr = nullptr;
+        for (const auto& m : g_levelMissions) { if (m.levelID == levelID) { missionPtr = &m; break; } }
+        if (!missionPtr) { log::error("Could not find mission data for level ID {}", levelID); FLAlertLayer::create("Error", "Mission data not found.", "OK")->show(); return; }
+        const LevelMission& mission = *missionPtr;
+
+        if (g_streakData.isLevelMissionClaimed(levelID)) { log::warn("Attempted to claim already claimed mission ID {}", levelID); FLAlertLayer::create("Error", "Mission already claimed.", "OK")->show(); updatePage(); return; }
+
+        GJGameLevel* level = GameLevelManager::sharedState()->getSavedLevel(levelID);
+        if (!level || level->m_normalPercent < 100) { log::error("Attempted to claim mission for level ID {} which is not completed!", levelID); FLAlertLayer::create("Error", "Level not completed yet.", "OK")->show(); updatePage(); return; }
+
+        g_streakData.completedLevelMissions.insert(levelID); 
+
+       
+        std::string rewardMessage = "";
+        bool isNewBadge = false;
+        if (!mission.rewardBadgeID.empty()) { isNewBadge = !g_streakData.isBadgeUnlocked(mission.rewardBadgeID); g_streakData.unlockBadge(mission.rewardBadgeID); auto bInfo = g_streakData.getBadgeInfo(mission.rewardBadgeID); rewardMessage = fmt::format("Badge: {}", bInfo ? bInfo->displayName : "Unknown"); }
+        if (mission.secondaryRewardType == LevelRewardType::SuperStars) { g_streakData.superStars += mission.secondaryRewardQuantity; if (!rewardMessage.empty()) rewardMessage += " and "; rewardMessage += fmt::format("{} Super Stars", mission.secondaryRewardQuantity); }
+        else if (mission.secondaryRewardType == LevelRewardType::StarTickets) { g_streakData.starTickets += mission.secondaryRewardQuantity; if (!rewardMessage.empty()) rewardMessage += " and "; rewardMessage += fmt::format("{} Tickets", mission.secondaryRewardQuantity); }
+
+        g_streakData.save(); 
+        updatePage(); 
+        FLAlertLayer::create("Reward Claimed!", fmt::format("You received: {}", rewardMessage), "OK")->show();
+        FMODAudioEngine::sharedEngine()->playEffect("achievement.mp3"_spr); // Sonido
+    }
+
+
+    bool setup() override {
+        this->setTitle("Level Challenges");
+        auto winSize = m_mainLayer->getContentSize();
+
+        m_totalPages = static_cast<int>(ceil(static_cast<float>(g_levelMissions.size()) / m_itemsPerPage));
+        if (m_totalPages == 0) m_totalPages = 1;
+
+        float bgWidth = 300.f; float bgHeight = 180.f;
+        auto background = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
+        background->setColor({ 0, 0, 0 }); background->setOpacity(120); background->setContentSize({ bgWidth, bgHeight }); background->setPosition(winSize / 2); m_mainLayer->addChild(background);
+
+        m_listContainer = CCLayer::create(); m_listContainer->setContentSize(background->getContentSize()); m_listContainer->setPosition(background->getPosition() - background->getContentSize() / 2); m_listContainer->setAnchorPoint({ 0, 0 }); m_mainLayer->addChild(m_listContainer);
+
+        auto leftSpr = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png");
+        m_leftArrow = CCMenuItemSpriteExtra::create(leftSpr, this, menu_selector(LevelProgressPopup::onSwitchPage)); m_leftArrow->setTag(-1);
+        auto rightSpr = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png"); rightSpr->setFlipX(true);
+        m_rightArrow = CCMenuItemSpriteExtra::create(rightSpr, this, menu_selector(LevelProgressPopup::onSwitchPage)); m_rightArrow->setTag(1);
+        auto arrowMenu = CCMenu::create(); arrowMenu->addChild(m_leftArrow); arrowMenu->addChild(m_rightArrow);
+        arrowMenu->alignItemsHorizontallyWithPadding(bgWidth + 15.f); arrowMenu->setPosition(winSize / 2); m_mainLayer->addChild(arrowMenu);
+
+        // Botón de Info
+        auto infoIcon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png"); infoIcon->setScale(0.7f);
+        auto infoBtn = CCMenuItemSpriteExtra::create(infoIcon, this, menu_selector(LevelProgressPopup::onMissionInfo));
+        auto infoMenu = CCMenu::createWithItem(infoBtn);
+        infoMenu->setPosition({ winSize.width - 25.f, winSize.height - 25.f }); m_mainLayer->addChild(infoMenu);
+
+        // Cargar primera página
+        m_currentPage = 0;
+        updatePage();
+
+        return true;
+    }
+
+public:
+    static LevelProgressPopup* create() {
+        auto ret = new LevelProgressPopup();
+        if (ret && ret->initAnchored(340.f, 240.f)) {
+            ret->autorelease();
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
+    }
+}; // --- Fin de la clase LevelProgressPopup ---
 
 class GenericPrizePopup : public Popup<GenericPrizeResult, std::function<void()>> {
 protected:
@@ -2078,6 +2328,457 @@ public:
     }
 };
 
+// --- (COPIA Y REEMPLAZA ESTO ANTES DE LA CLASE InfoPopup EN Popups.h) ---
+
+class DonationPopup : public Popup<> {
+protected:
+    // --- Callbacks (Sin cambios) ---
+    void onConfirmKofi(bool btn2) {
+        if (btn2) {
+            cocos2d::CCApplication::sharedApplication()->openURL("https://ko-fi.com/streakservers");
+        }
+    }
+    void onGoToKofi(CCObject*) {
+        createQuickPopup(
+            "Wait!",
+            "Please read the steps (<cb>click the info icon</c>) <cr>before</c> donating to know how to claim your rewards.",
+            "Cancel", "Continue to Ko-fi",
+            [this](FLAlertLayer*, bool btn2) {
+                this->onConfirmKofi(btn2);
+            }
+        );
+    }
+    void onOpenDiscordInfo(CCObject*) {
+        createQuickPopup(
+            "How to Claim Rewards",
+            "After donating on Ko-fi, please join our <cg>Discord</c> server and <cy>open a ticket</c> with a screenshot of your donation to receive your rewards.\n\n<cy>Discord Link:</c>\n<cg>https://discord.gg/vEPWBuFEn5</c>",
+            "OK", "Join Discord",
+            [](FLAlertLayer*, bool btn2) {
+                if (btn2) {
+                    cocos2d::CCApplication::sharedApplication()->openURL("https://discord.gg/vEPWBuFEn5");
+                }
+            }
+        );
+    }
+
+    // --- Función setup (Layout reajustado) ---
+    bool setup() override {
+        this->setTitle("Support the Mod");
+        auto winSize = this->m_mainLayer->getContentSize(); // Tamaño del popup (Ahora 280x200)
+
+        auto menu = CCMenu::create();
+        menu->setPosition(0, 0);
+        this->m_mainLayer->addChild(menu);
+
+        // 1. Banner promocional
+        auto banner = CCSprite::create("support_banner.png"_spr);
+        if (banner) {
+            // Posicionamos el banner "en el medio" (verticalmente)
+            banner->setPosition({ winSize.width / 2, winSize.height / 2 + 15.f }); // Y = 115
+            // Lo hacemos "un poco más grande"
+            banner->setScale(0.7f);
+            this->m_mainLayer->addChild(banner);
+        }
+        else {
+            log::error("No se pudo encontrar support_banner.png");
+        }
+
+        // 2. Botón para ir a Ko-fi
+        auto kofiBtnSprite = ButtonSprite::create("Go to Ko-fi", 0, 0, "goldFont.fnt", "GJ_button_01.png", 0, 0.8f);
+        kofiBtnSprite->setScale(0.8f);
+        auto kofiBtn = CCMenuItemSpriteExtra::create(
+            kofiBtnSprite, this, menu_selector(DonationPopup::onGoToKofi)
+        );
+        // Posicionamos el botón "abajo del pup"
+        kofiBtn->setPosition({ winSize.width / 2, 40.f }); // Y = 40 (cerca del fondo)
+        menu->addChild(kofiBtn);
+
+        // 3. Botón de información (GJ_infoIcon_001.png)
+        auto infoIcon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png");
+        infoIcon->setScale(0.8f);
+        auto infoBtn = CCMenuItemSpriteExtra::create(
+            infoIcon, this, menu_selector(DonationPopup::onOpenDiscordInfo)
+        );
+        // Posicionamos el botón en la esquina inferior izquierda
+        infoBtn->setPosition({ 35.f, 35.f });
+        menu->addChild(infoBtn);
+
+        return true;
+    }
+
+public:
+    // --- Función create (Tamaño 200px de alto) ---
+    static DonationPopup* create() {
+        auto ret = new DonationPopup();
+
+        // Volvemos a 200px de alto para dar espacio
+        if (ret && ret->initAnchored(280.f, 200.f)) { // (ancho, alto)
+            ret->autorelease();
+            return ret;
+        }
+
+        CC_SAFE_DELETE(ret);
+        return nullptr;
+    }
+};
+
+
+
+
+
+class LeaderboardCell : public CCLayer {
+protected:
+    matjson::Value m_playerData;
+
+    bool init(matjson::Value playerData, int rank) {
+        if (!CCLayer::init()) return false;
+        this->m_playerData = playerData;
+
+        float cellWidth = 300.f;
+        float cellHeight = 40.f;
+        this->setContentSize({ cellWidth, cellHeight });
+
+        // --- Rango ---
+        ccColor3B rankColor = { 255, 255, 255 };
+        if (rank == 1) rankColor = { 255, 215, 0 }; // Oro
+        if (rank == 2) rankColor = { 192, 192, 192 }; // Plata
+        if (rank == 3) rankColor = { 205, 127, 50 }; // Bronce
+
+        auto rankLabel = CCLabelBMFont::create(fmt::format("#{}", rank).c_str(), "goldFont.fnt");
+        rankLabel->setColor(rankColor);
+        rankLabel->limitLabelWidth(40.f, 0.6f, 0.1f);
+        rankLabel->setPosition({ 25.f, cellHeight / 2 });
+        this->addChild(rankLabel);
+
+        // --- Insignia ---
+        std::string badgeID = playerData["equipped_badge_id"].as<std::string>().unwrapOr("");
+        if (!badgeID.empty()) {
+            if (auto badgeInfo = g_streakData.getBadgeInfo(badgeID)) {
+                auto badgeSprite = CCSprite::create(badgeInfo->spriteName.c_str());
+                if (badgeSprite) {
+                    badgeSprite->setScale(0.15f);
+                    badgeSprite->setPosition({ 55.f, cellHeight / 2 });
+                    this->addChild(badgeSprite);
+                }
+            }
+        }
+
+        // --- Nombre de Usuario ---
+        std::string username = playerData["username"].as<std::string>().unwrapOr("Unknown");
+        auto usernameLabel = CCLabelBMFont::create(username.c_str(), "goldFont.fnt");
+        usernameLabel->limitLabelWidth(100.f, 0.5f, 0.1f);
+
+        auto usernameBtn = CCMenuItemSpriteExtra::create(
+            usernameLabel, this, menu_selector(LeaderboardCell::onViewProfile)
+        );
+        usernameBtn->setPosition({ 115.f, cellHeight / 2 });
+
+        auto menu = CCMenu::createWithItem(usernameBtn);
+        menu->setPosition({ 0, 0 });
+        this->addChild(menu);
+
+        // --- Días de Racha ---
+        int streakDays = playerData["current_streak_days"].as<int>().unwrapOr(0);
+        auto streakIcon = CCSprite::create("racha1.png"_spr);
+        streakIcon->setScale(0.15f);
+        streakIcon->setPosition({ cellWidth - 100.f, cellHeight / 2 });
+        this->addChild(streakIcon);
+
+        auto streakLabel = CCLabelBMFont::create(std::to_string(streakDays).c_str(), "bigFont.fnt");
+        streakLabel->setScale(0.35f);
+        streakLabel->setAnchorPoint({ 0.f, 0.5f });
+        streakLabel->setPosition({ streakIcon->getPositionX() + 10.f, cellHeight / 2 });
+        this->addChild(streakLabel);
+
+        // --- Puntos de Racha ---
+        int streakPoints = playerData["total_streak_points"].as<int>().unwrapOr(0);
+        auto pointIcon = CCSprite::create("streak_point.png"_spr);
+        pointIcon->setScale(0.15f);
+        pointIcon->setPosition({ cellWidth - 45.f, cellHeight / 2 });
+        this->addChild(pointIcon);
+
+        auto pointsLabel = CCLabelBMFont::create(std::to_string(streakPoints).c_str(), "bigFont.fnt");
+        pointsLabel->setScale(0.35f);
+        pointsLabel->setAnchorPoint({ 0.f, 0.5f });
+        pointsLabel->setPosition({ pointIcon->getPositionX() + 10.f, cellHeight / 2 });
+        this->addChild(pointsLabel);
+
+        return true;
+    }
+
+    void onViewProfile(CCObject*) {
+        int accountID = m_playerData["accountID"].as<int>().unwrapOr(0);
+        std::string username = m_playerData["username"].as<std::string>().unwrapOr("Unknown");
+        int userID = m_playerData["userID"].as<int>().unwrapOr(0);
+
+        if (accountID != 0) {
+            auto score = GJUserScore::create();
+            score->m_accountID = accountID;
+            score->m_userName = username;
+            score->m_userID = userID;
+            ProfilePage::create(accountID, false)->show();
+        }
+    }
+
+public:
+    static LeaderboardCell* create(matjson::Value playerData, int rank) {
+        auto ret = new LeaderboardCell();
+        if (ret && ret->init(playerData, rank)) {
+            ret->autorelease();
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
+    }
+};
+
+class LeaderboardPopup : public Popup<> {
+protected:
+    struct Fields {
+        EventListener<web::WebTask> m_leaderboardListener;
+        LoadingCircle* m_loadingCircle = nullptr;
+        CCNode* m_listContainer = nullptr;
+        CCMenuItemSpriteExtra* m_leftArrow = nullptr;
+        CCMenuItemSpriteExtra* m_rightArrow = nullptr;
+        std::vector<matjson::Value> m_leaderboardData;
+        int m_currentPage = 0;
+        int m_totalPages = 0;
+        // --- Cambiado a 5 items por página ---
+        const int m_itemsPerPage = 5;
+        CCLabelBMFont* m_errorLabel = nullptr;
+    };
+    Fields m_fields;
+
+    void buildList(const matjson::Value& playersValue, CCSize listSize, CCSize winSize) {
+        if (this->m_fields.m_errorLabel) {
+            this->m_fields.m_errorLabel->removeFromParent();
+            this->m_fields.m_errorLabel = nullptr;
+        }
+        if (!this->m_fields.m_listContainer) {
+            log::error("buildList: m_listContainer es nulo!");
+            this->showError("Error interno al crear lista.");
+            return;
+        }
+        this->m_fields.m_listContainer->removeAllChildrenWithCleanup(true);
+
+        // --- CORRECCIÓN: Usar AxisAlignment::End para ordenar #1 arriba ---
+        auto layout = ColumnLayout::create()
+            ->setAxisAlignment(AxisAlignment::End) // <-- Cambio aquí para orden correcto
+            ->setGap(2.f);
+        this->m_fields.m_listContainer->setLayout(layout);
+
+        int startIndex = this->m_fields.m_currentPage * this->m_fields.m_itemsPerPage;
+        int endIndex = std::min(startIndex + this->m_fields.m_itemsPerPage, static_cast<int>(this->m_fields.m_leaderboardData.size()));
+
+        // --- Añadir elementos en orden inverso para que End los coloque bien ---
+        // Iteramos de endIndex-1 hacia startIndex
+        for (int i = endIndex - 1; i >= startIndex; --i) {
+            int rank = i + 1;
+            const matjson::Value& playerJson = this->m_fields.m_leaderboardData[i];
+            if (playerJson.as<std::map<std::string, matjson::Value>>().isOk()) {
+                // AxisAlignment::End pondrá el último añadido (rank #1) arriba
+                this->m_fields.m_listContainer->addChild(LeaderboardCell::create(playerJson, rank));
+            }
+            else {
+                log::warn("Item {} no es un objeto JSON válido.", rank);
+            }
+        }
+
+        this->m_fields.m_listContainer->updateLayout();
+        this->updatePageControls();
+    } // Cierre buildList
+
+
+    void storeData(const matjson::Value& playersValue) {
+        auto playersVecResult = playersValue.as<std::vector<matjson::Value>>();
+        if (playersVecResult.isOk()) {
+            this->m_fields.m_leaderboardData = playersVecResult.unwrap();
+            if (this->m_fields.m_leaderboardData.empty()) {
+                this->showError("Leaderboard is empty.");
+                this->updatePageControls();
+                return;
+            }
+            this->m_fields.m_totalPages = static_cast<int>(ceil(static_cast<float>(this->m_fields.m_leaderboardData.size()) / this->m_fields.m_itemsPerPage));
+            if (this->m_fields.m_totalPages == 0) this->m_fields.m_totalPages = 1;
+            this->m_fields.m_currentPage = 0;
+        }
+        else {
+            log::error("storeData: playersValue could not be converted to std::vector<matjson::Value>");
+            this->showError("Error processing data.");
+            this->updatePageControls();
+        }
+    }
+
+    void updatePageControls() {
+        bool hasData = !this->m_fields.m_leaderboardData.empty();
+        bool showError = this->m_fields.m_errorLabel != nullptr;
+
+        if (this->m_fields.m_leftArrow) this->m_fields.m_leftArrow->setVisible(hasData && !showError && this->m_fields.m_currentPage > 0);
+        if (this->m_fields.m_rightArrow) this->m_fields.m_rightArrow->setVisible(hasData && !showError && this->m_fields.m_currentPage < this->m_fields.m_totalPages - 1);
+
+        if (hasData && !showError) {
+            this->setTitle(fmt::format("Top Streaks ({}/{})", this->m_fields.m_currentPage + 1, this->m_fields.m_totalPages).c_str());
+        }
+        else if (!showError) {
+            this->setTitle("Top Streaks");
+        }
+    }
+
+
+    void onPrevPage(CCObject*) {
+        if (this->m_fields.m_currentPage > 0) {
+            this->m_fields.m_currentPage--;
+            this->buildList(matjson::Value(this->m_fields.m_leaderboardData),
+                this->m_fields.m_listContainer->getContentSize(),
+                this->m_mainLayer->getContentSize());
+        }
+    }
+    void onNextPage(CCObject*) {
+        if (this->m_fields.m_currentPage < this->m_fields.m_totalPages - 1) {
+            this->m_fields.m_currentPage++;
+            this->buildList(matjson::Value(this->m_fields.m_leaderboardData),
+                this->m_fields.m_listContainer->getContentSize(),
+                this->m_mainLayer->getContentSize());
+        }
+    }
+
+    void showError(std::string error) {
+        if (this->m_fields.m_loadingCircle) {
+            this->m_fields.m_loadingCircle->fadeAndRemove();
+            this->m_fields.m_loadingCircle = nullptr;
+        }
+        if (!this->m_fields.m_errorLabel) {
+            this->m_fields.m_errorLabel = CCLabelBMFont::create(error.c_str(), "bigFont.fnt");
+            this->m_fields.m_errorLabel->setPosition(this->m_mainLayer->getContentSize() / 2);
+            this->m_fields.m_errorLabel->setScale(0.4f);
+            this->m_fields.m_errorLabel->setColor({ 255, 100, 100 });
+            this->m_mainLayer->addChild(this->m_fields.m_errorLabel);
+        }
+        this->updatePageControls();
+    }
+
+    void handleLeaderboardResponse(web::WebTask::Event* e, CCSize listSize, CCSize winSize) {
+        if (this->m_fields.m_loadingCircle) {
+            this->m_fields.m_loadingCircle->fadeAndRemove();
+            this->m_fields.m_loadingCircle = nullptr;
+        }
+        if (this->m_fields.m_errorLabel) {
+            this->m_fields.m_errorLabel->removeFromParent();
+            this->m_fields.m_errorLabel = nullptr;
+        }
+
+        if (e->isCancelled()) {
+            this->showError("Error de red o petición cancelada.");
+            return;
+        }
+
+        web::WebResponse* res = e->getValue();
+        if (res) {
+            auto jsonResult = res->json();
+            if (res->ok() && jsonResult.isOk()) {
+                auto data = jsonResult.unwrap();
+                if (data.as<std::vector<matjson::Value>>().isOk()) {
+                    this->storeData(data);
+                    if (!this->m_fields.m_errorLabel) {
+                        // Pasamos el listSize correcto a buildList
+                        this->buildList(data, listSize, winSize);
+                    }
+                }
+                else {
+                    log::error("Server response is not a JSON array!");
+                    this->showError("Error: Respuesta inesperada del servidor.");
+                }
+            }
+            else {
+                std::string errorBody = "N/A";
+                auto bodyResult = res->string();
+                if (bodyResult.isOk()) { errorBody = bodyResult.unwrap(); }
+                else { errorBody = "Could not read error body"; }
+                log::error("Error del servidor: {}. Body: {}", res->code(), errorBody);
+                this->showError(fmt::format("Error del servidor: {}", res->code()));
+            }
+        }
+        else {
+            log::error("Evento de WebTask inesperado: ni cancelado ni con valor.");
+            this->showError("Loading.");
+        }
+    } // Cierre handleLeaderboardResponse
+
+
+    bool setup() override {
+        // --- Tamaño del Popup reducido ---
+        m_mainLayer->setContentSize({ 340.f, 260.f }); // Ancho, Alto más compacto
+        this->setTitle("Top Streaks");
+        auto winSize = this->m_mainLayer->getContentSize();
+
+        // Fondo principal
+        auto background = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
+        background->setColor({ 0, 0, 0 });
+        background->setOpacity(120);
+        // --- Tamaño del fondo reducido para 5 celdas ---
+        // 5 celdas * 40 alto + 4 espacios * 2 = 208
+        CCSize listSize = { 300.f, 210.f };
+        background->setContentSize(listSize);
+        background->setPosition(winSize / 2);
+        this->m_mainLayer->addChild(background);
+
+        // Contenedor para celdas
+        this->m_fields.m_listContainer = CCNode::create();
+        this->m_fields.m_listContainer->setContentSize(listSize);
+        this->m_fields.m_listContainer->setPosition(background->getPosition() - background->getContentSize() / 2);
+        this->m_mainLayer->addChild(this->m_fields.m_listContainer);
+
+        // Flechas (sin cambios en creación, posición ajustada implicitamente por winSize/listSize)
+        auto sprLeft = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png");
+        this->m_fields.m_leftArrow = CCMenuItemSpriteExtra::create(sprLeft, this, menu_selector(LeaderboardPopup::onPrevPage));
+        this->m_fields.m_leftArrow->setPosition(-listSize.width / 2 - 20.f, 0);
+        this->m_fields.m_leftArrow->setVisible(false);
+
+        auto sprRight = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png");
+        sprRight->setFlipX(true);
+        this->m_fields.m_rightArrow = CCMenuItemSpriteExtra::create(sprRight, this, menu_selector(LeaderboardPopup::onNextPage));
+        this->m_fields.m_rightArrow->setPosition(listSize.width / 2 + 20.f, 0);
+        this->m_fields.m_rightArrow->setVisible(false);
+
+        auto arrowMenu = CCMenu::create();
+        arrowMenu->addChild(this->m_fields.m_leftArrow);
+        arrowMenu->addChild(this->m_fields.m_rightArrow);
+        arrowMenu->setPosition(winSize / 2);
+        this->m_mainLayer->addChild(arrowMenu);
+
+        // Círculo de carga
+        this->m_fields.m_loadingCircle = LoadingCircle::create();
+        this->m_fields.m_loadingCircle->setPosition(winSize / 2);
+        this->m_fields.m_loadingCircle->show();
+        this->m_mainLayer->addChild(this->m_fields.m_loadingCircle);
+
+        // Llamar a handleLeaderboardResponse (Pasando el listSize correcto)
+        this->m_fields.m_leaderboardListener.bind([this, listSize, winSize](web::WebTask::Event* e) {
+            // Pasamos el listSize calculado aquí
+            this->handleLeaderboardResponse(e, listSize, winSize);
+            });
+
+        auto req = web::WebRequest();
+        this->m_fields.m_leaderboardListener.setFilter(
+            req.get("https://streak-servidor.onrender.com/leaderboard")
+        );
+
+        return true;
+    } // Cierra setup()
+
+public:
+    static LeaderboardPopup* create() {
+        auto ret = new LeaderboardPopup();
+        // --- Tamaño del Popup reducido en initAnchored ---
+        if (ret && ret->initAnchored(340.f, 260.f)) { // Ancho, Alto más compacto
+            ret->autorelease();
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
+    }
+}; // Cierra LeaderboardPopup
+
 class RewardsPopup : public Popup<> {
 protected:
     int m_currentCategory = 0;
@@ -2373,23 +3074,26 @@ CCAction* createShakeAction(float duration, float strength) {
     return CCSequence::create(shake);
 }
 
+
+
 class InfoPopup : public Popup<> {
 protected:
-   
+    // Variables miembro
     CCLabelBMFont* m_streakLabel = nullptr;
     CCLayerGradient* m_barFg = nullptr;
     CCLabelBMFont* m_barText = nullptr;
     CCSprite* m_rachaIndicator = nullptr;
+    // Ya no necesitamos m_dailyPageToOpen ni m_isTransitioning
 
-   
+    // Función setup
     bool setup() override;
 
-  
 public:
+    // Función para actualizar la UI
     void updateDisplay();
 
 protected:
-    
+    // Callbacks y animaciones
     void showStreakAnimation(int streakLevel);
     void onAnimationExit();
     void onOpenHistory(CCObject*);
@@ -2400,34 +3104,46 @@ protected:
     void onRedeemCode(CCObject*);
     void onInfo(CCObject*);
     void onOpenRoulette(CCObject*);
+    void onDailyLevel(CCObject*);
+    void onOpenLevelProgress(CCObject*); // Callback para Level Progress
+    void onOpenDonations(CCObject*);
+    void onOpenLeaderboard(CCObject*);
+    // Declaración correcta de onClose
+    void onClose(CCObject* sender) override;
 
 public:
-   
+    // Método estático create
     static InfoPopup* create();
 };
 
+// --- Implementación de las funciones de InfoPopup ---
 
 bool InfoPopup::setup() {
-
     this->setTitle("My Streak");
     auto winSize = m_mainLayer->getContentSize();
     float centerY = winSize.height / 2 + 25;
 
-  
+    // Botón Central (Imagen Racha)
     auto rachaSprite = CCSprite::create(g_streakData.getRachaSprite().c_str());
-    rachaSprite->setScale(0.4f);
-    auto rachaBtn = CCMenuItemSpriteExtra::create(rachaSprite, this, menu_selector(InfoPopup::onRachaClick));
-    auto menuRacha = CCMenu::createWithItem(rachaBtn);
-    menuRacha->setPosition({ winSize.width / 2, centerY });
-    m_mainLayer->addChild(menuRacha, 3);
-    rachaSprite->runAction(CCRepeatForever::create(CCSequence::create(CCMoveBy::create(1.5f, { 0, 8 }), CCMoveBy::create(1.5f, { 0, -8 }), nullptr)));
+    if (rachaSprite) {
+        rachaSprite->setScale(0.4f);
+        auto rachaBtn = CCMenuItemSpriteExtra::create(rachaSprite, this, menu_selector(InfoPopup::onRachaClick));
+        auto menuRacha = CCMenu::createWithItem(rachaBtn);
+        menuRacha->setPosition({ winSize.width / 2, centerY });
+        m_mainLayer->addChild(menuRacha, 3);
+        rachaSprite->runAction(CCRepeatForever::create(CCSequence::create(CCMoveBy::create(1.5f, { 0, 8 }), CCMoveBy::create(1.5f, { 0, -8 }), nullptr)));
+    }
+    else {
+        log::error("Failed to create racha sprite: {}", g_streakData.getRachaSprite());
+    }
 
-  
+    // Etiqueta de Racha
     m_streakLabel = CCLabelBMFont::create("Daily streak: ?", "goldFont.fnt");
     m_streakLabel->setScale(0.55f);
     m_streakLabel->setPosition({ winSize.width / 2, centerY - 60 });
     m_mainLayer->addChild(m_streakLabel);
 
+    // Barra de Progreso
     float barWidth = 140.0f;
     float barHeight = 16.0f;
     auto barBg = CCLayerColor::create({ 45, 45, 45, 255 }, barWidth, barHeight);
@@ -2456,56 +3172,94 @@ bool InfoPopup::setup() {
     m_rachaIndicator->setPosition({ winSize.width / 2 + barWidth / 2 + 20, centerY - 82 });
     m_mainLayer->addChild(m_rachaIndicator, 5);
 
-    
-    auto menuSide = CCMenu::create();
-    menuSide->setPosition(0, 0);
-    m_mainLayer->addChild(menuSide, 10);
+    // Menú para botones laterales y de esquinas
+    auto cornerMenu = CCMenu::create();
+    cornerMenu->setPosition(0, 0);
+    m_mainLayer->addChild(cornerMenu, 10);
 
-    auto statsIcon = CCSprite::create("BtnStats.png"_spr);
-    statsIcon->setScale(0.7f);
+    // Añadir todos los botones laterales/esquinas (Stats, Rewards, Missions, Roulette, Info)
+    auto statsIcon = CCSprite::create("BtnStats.png"_spr); statsIcon->setScale(0.7f);
     auto statsBtn = CCMenuItemSpriteExtra::create(statsIcon, this, menu_selector(InfoPopup::onOpenStats));
-    statsBtn->setPosition({ winSize.width - 22, centerY });
-    menuSide->addChild(statsBtn);
+    statsBtn->setPosition({ winSize.width - 22, centerY }); cornerMenu->addChild(statsBtn);
 
-    auto rewardsIcon = CCSprite::create("RewardsBtn.png"_spr);
-    rewardsIcon->setScale(0.7f);
+    auto rewardsIcon = CCSprite::create("RewardsBtn.png"_spr); rewardsIcon->setScale(0.7f);
     auto rewardsBtn = CCMenuItemSpriteExtra::create(rewardsIcon, this, menu_selector(InfoPopup::onOpenRewards));
-    rewardsBtn->setPosition({ winSize.width - 22, centerY - 37 });
-    menuSide->addChild(rewardsBtn);
+    rewardsBtn->setPosition({ winSize.width - 22, centerY - 37 }); cornerMenu->addChild(rewardsBtn);
 
-    auto missionsIcon = CCSprite::create("super_star_btn.png"_spr);
-    missionsIcon->setScale(0.7f);
+    auto missionsIcon = CCSprite::create("super_star_btn.png"_spr); missionsIcon->setScale(0.7f);
     auto missionsBtn = CCMenuItemSpriteExtra::create(missionsIcon, this, menu_selector(InfoPopup::onOpenMissions));
-    missionsBtn->setPosition({ 22, centerY });
-    menuSide->addChild(missionsBtn);
+    missionsBtn->setPosition({ 22, centerY }); cornerMenu->addChild(missionsBtn);
 
-    auto rouletteIcon = CCSprite::create("boton_ruleta.png"_spr);
-    rouletteIcon->setScale(0.7f);
+    auto rouletteIcon = CCSprite::create("boton_ruleta.png"_spr); rouletteIcon->setScale(0.7f);
     auto rouletteBtn = CCMenuItemSpriteExtra::create(rouletteIcon, this, menu_selector(InfoPopup::onOpenRoulette));
-    rouletteBtn->setPosition({ 22, centerY - 37 });
-    menuSide->addChild(rouletteBtn);
+    rouletteBtn->setPosition({ 22, centerY - 37 }); cornerMenu->addChild(rouletteBtn);
 
-    auto infoIcon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png");
-    infoIcon->setScale(0.6f);
+    auto infoIcon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png"); infoIcon->setScale(0.6f);
     auto infoBtn = CCMenuItemSpriteExtra::create(infoIcon, this, menu_selector(InfoPopup::onInfo));
-    infoBtn->setPosition({ winSize.width - 20, winSize.height - 20 });
-    menuSide->addChild(infoBtn);
+    infoBtn->setPosition({ winSize.width - 20, winSize.height - 20 }); cornerMenu->addChild(infoBtn);
 
-    auto historyIcon = CCSprite::create("historial_btn.png"_spr);
-    historyIcon->setScale(0.7f);
+
+    // --- MENÚ INFERIOR CORREGIDO ---
+    auto bottomMenu = CCMenu::create();
+    bottomMenu->setPosition(0, 0); // La posición final se ajustará después de alinear
+    m_mainLayer->addChild(bottomMenu, 10);
+
+    // 1. Botón History (Izquierda)
+    auto historyIcon = CCSprite::create("historial_btn.png"_spr); historyIcon->setScale(0.7f);
     auto historyBtn = CCMenuItemSpriteExtra::create(historyIcon, this, menu_selector(InfoPopup::onOpenHistory));
-    historyBtn->setPosition({ 20, 20 });
-    menuSide->addChild(historyBtn);
+    // Ya no establecemos posición aquí, align lo hará
 
-    auto redeemIcon = CCSprite::create("redemcode_btn.png"_spr);
-    redeemIcon->setScale(0.7f);
+    // 2. Botón Redeem Code (Derecha)
+    auto redeemIcon = CCSprite::create("redemcode_btn.png"_spr); redeemIcon->setScale(0.7f);
     auto redeemBtn = CCMenuItemSpriteExtra::create(redeemIcon, this, menu_selector(InfoPopup::onRedeemCode));
-    redeemBtn->setPosition({ winSize.width - 20, 20 });
-    menuSide->addChild(redeemBtn);
+    // Ya no establecemos posición aquí
 
+    // 3. Botón Daily (Centro-Derecha)
+    auto dailyIcon = CCSprite::create("daily_btn.png"_spr);
+    if (!dailyIcon) { log::error("Could not find daily_btn.png"); dailyIcon = ButtonSprite::create("Daily"); }
+    else { dailyIcon->setScale(0.7f); }
+    auto dailyBtn = CCMenuItemSpriteExtra::create(dailyIcon, this, menu_selector(InfoPopup::onDailyLevel));
     
-    this->updateDisplay();
+    //top
+    auto topIcon = CCSprite::create("top_btn.png"_spr);
+    if (!topIcon) { log::error("No se pudo encontrar top_btn.png"); topIcon = ButtonSprite::create("Top"); }
+    else { topIcon->setScale(0.7f); }
+    auto topBtn = CCMenuItemSpriteExtra::create(topIcon, this, menu_selector(InfoPopup::onOpenLeaderboard));
+    bottomMenu->addChild(topBtn); 
 
+    // 3. Botón Ko-fi (Centro)
+    auto kofiIcon = CCSprite::create("ko-fi_btn.png"_spr); // Asegúrate que "ko-fi_btn.png" esté en resources/
+    if (!kofiIcon) {
+        log::error("No se pudo encontrar ko-fi_btn.png");
+        kofiIcon = ButtonSprite::create("Donate"); // Sprite de reserva por si falla
+    }
+    else {
+        kofiIcon->setScale(0.7f); // Ajusta la escala si es necesario
+    }
+    auto kofiBtn = CCMenuItemSpriteExtra::create(kofiIcon, this, menu_selector(InfoPopup::onOpenDonations));
+
+    // 4. Botón Level Progress (Centro-Izquierda)
+    auto levelProgIcon = CCSprite::create("level_progess_btn.png"_spr);
+    if (!levelProgIcon) { log::error("No se pudo encontrar level_progess_btn.png"); levelProgIcon = ButtonSprite::create("Lvls"); }
+    else { levelProgIcon->setScale(0.7f); }
+    auto levelProgBtn = CCMenuItemSpriteExtra::create(levelProgIcon, this, menu_selector(InfoPopup::onOpenLevelProgress));
+    // Ya no establecemos posición aquí
+
+    // --- Añadir botones al menú en el orden deseado (Izquierda a Derecha) ---
+    bottomMenu->addChild(historyBtn);
+    bottomMenu->addChild(levelProgBtn); // Añadido
+    bottomMenu->addChild(dailyBtn);     // Añadido
+    bottomMenu->addChild(redeemBtn);
+    bottomMenu->addChild(kofiBtn);
+
+    // --- Alinear y Posicionar el Menú ---
+    bottomMenu->alignItemsHorizontallyWithPadding(2.0f);
+    bottomMenu->setPosition({ winSize.width / 2, 23.f });
+    // --- FIN MENÚ INFERIOR CORREGIDO ---
+
+
+    // Configuración final (sin cambios)
+    this->updateDisplay();
     if (g_streakData.shouldShowAnimation()) {
         this->showStreakAnimation(g_streakData.currentStreak);
     }
@@ -2513,32 +3267,27 @@ bool InfoPopup::setup() {
 }
 
 void InfoPopup::updateDisplay() {
-    if (!m_streakLabel || !m_barFg || !m_barText || !m_rachaIndicator) {
-        log::warn("Intentando actualizar InfoPopup antes de que sus elementos esten listos.");
-        return;
-    }
-
+    if (!m_mainLayer || !m_streakLabel || !m_barFg || !m_barText || !m_rachaIndicator) { return; }
     int currentStreak = g_streakData.currentStreak;
     int pointsToday = g_streakData.streakPointsToday;
     int requiredPoints = g_streakData.getRequiredPoints();
-    float percent = requiredPoints > 0 ? std::min(static_cast<float>(pointsToday) / requiredPoints, 1.0f) : 0.f;
+    float percent = (requiredPoints > 0) ? std::min(static_cast<float>(pointsToday) / requiredPoints, 1.0f) : 0.f;
     float barWidth = 140.0f;
     float barHeight = 16.0f;
-
     m_streakLabel->setString(fmt::format("Daily streak: {}", currentStreak).c_str());
     m_barFg->setContentSize({ barWidth * percent, barHeight });
     m_barText->setString(fmt::format("{}/{}", pointsToday, requiredPoints).c_str());
-
     std::string indicatorSpriteName = (pointsToday >= requiredPoints) ? g_streakData.getRachaSprite() : "racha0.png"_spr;
     if (auto newSprite = CCSprite::create(indicatorSpriteName.c_str())) {
         if (auto newTexture = newSprite->getTexture()) {
+            // Intentar actualizar textura y rect de forma segura
             m_rachaIndicator->setTexture(newTexture);
-          
-            m_rachaIndicator->setTextureRect(newSprite->getTextureRect());
+            m_rachaIndicator->setTextureRect(newSprite->getTextureRect(), newSprite->isTextureRectRotated(), newSprite->getContentSize());
         }
     }
 }
 
+// --- Implementaciones de los Callbacks ---
 
 void InfoPopup::onOpenHistory(CCObject*) { HistoryPopup::create()->show(); }
 void InfoPopup::onOpenStats(CCObject*) { DayProgressPopup::create()->show(); }
@@ -2546,7 +3295,19 @@ void InfoPopup::onOpenRewards(CCObject*) { RewardsPopup::create()->show(); }
 void InfoPopup::onRachaClick(CCObject*) { AllRachasPopup::create()->show(); }
 void InfoPopup::onOpenMissions(CCObject*) { MissionsPopup::create()->show(); }
 void InfoPopup::onRedeemCode(CCObject*) { RedeemCodePopup::create()->show(); }
-
+void InfoPopup::onOpenLeaderboard(CCObject*) {
+    LeaderboardPopup::create()->show();
+}
+void InfoPopup::onOpenRoulette(CCObject*) {
+    if (g_streakData.currentStreak < 1) {
+        FLAlertLayer::create("Roulette Locked", "You need a streak of at least <cg>1 day</c> to use the roulette.", "OK")->show();
+        return;
+    }
+    RoulettePopup::create()->show();
+}
+void InfoPopup::onOpenDonations(CCObject*) {
+    DonationPopup::create()->show();
+}
 void InfoPopup::onInfo(CCObject*) {
     std::string message =
         "Complete rated levels every day to earn <cp>Streak Points</c> and increase your streak!\n\n"
@@ -2559,69 +3320,52 @@ void InfoPopup::onInfo(CCObject*) {
     FLAlertLayer::create("About Streak!", message, "OK")->show();
 }
 
-void InfoPopup::onOpenRoulette(CCObject*) {
-    if (g_streakData.currentStreak < 1) {
-        FLAlertLayer::create("Roulette Locked", "You need a streak of at least <cg>1 day</c> to use the roulette.", "OK")->show();
+// --- Callback para ir a CreatorLayer (Método Robusto) ---
+void InfoPopup::onDailyLevel(CCObject*) {
+    log::info("Navigating to CreatorLayer scene...");
+    auto creatorScene = CreatorLayer::scene();
+    if (!creatorScene) {
+        log::error("Failed to create CreatorLayer scene!");
+        FLAlertLayer::create("Error", "Could not navigate to Creator screen.", "OK")->show();
         return;
     }
-    RoulettePopup::create()->show();
+    // Usar transición para cambiar de escena
+    CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f, creatorScene));
+    // No necesitamos llamar a onClose manualmente aquí
+}
+
+// --- Callback para Abrir LevelProgressPopup ---
+void InfoPopup::onOpenLevelProgress(CCObject*) {
+    LevelProgressPopup::create()->show();
 }
 
 
+// --- Animación ---
 void InfoPopup::showStreakAnimation(int streakLevel) {
     auto winSize = CCDirector::sharedDirector()->getWinSize();
-    auto animLayer = CCLayer::create();
-    animLayer->setTag(111);
-    this->addChild(animLayer, 1000);
-    auto bg = CCLayerColor::create({ 0, 0, 0, 180 });
-    bg->setOpacity(0);
-    bg->runAction(CCFadeTo::create(0.3f, 180));
-    animLayer->addChild(bg);
-    auto rachaSprite = CCSprite::create(g_streakData.getRachaSprite().c_str());
-    rachaSprite->setPosition(winSize / 2);
-    rachaSprite->setScale(0.1f);
-    rachaSprite->setOpacity(0);
-    animLayer->addChild(rachaSprite);
-    auto daysLabel = CCLabelBMFont::create(CCString::createWithFormat("Day %d!", streakLevel)->getCString(), "goldFont.fnt");
-    daysLabel->setPosition({ winSize.width / 2, winSize.height / 2 - 80.f });
-    daysLabel->setScale(0.1f);
-    daysLabel->setOpacity(0);
-    animLayer->addChild(daysLabel);
+    auto animLayer = CCLayer::create(); animLayer->setTag(111); this->addChild(animLayer, 1000);
+    auto bg = CCLayerColor::create({ 0, 0, 0, 0 }); bg->runAction(CCFadeTo::create(0.3f, 180)); animLayer->addChild(bg);
+    auto rachaSprite = CCSprite::create(g_streakData.getRachaSprite().c_str()); if (rachaSprite) { rachaSprite->setPosition(winSize / 2); rachaSprite->setScale(0.1f); rachaSprite->setOpacity(0); animLayer->addChild(rachaSprite); rachaSprite->runAction(CCSpawn::create(CCFadeIn::create(0.4f), CCEaseBackOut::create(CCScaleTo::create(0.4f, 1.0f)), nullptr)); }
+    auto daysLabel = CCLabelBMFont::create(fmt::format("Day {}!", streakLevel).c_str(), "goldFont.fnt"); daysLabel->setPosition({ winSize.width / 2, winSize.height / 2 - 80.f }); daysLabel->setScale(0.1f); daysLabel->setOpacity(0); animLayer->addChild(daysLabel); daysLabel->runAction(CCSequence::create(CCDelayTime::create(0.2f), CCSpawn::create(CCFadeIn::create(0.4f), CCEaseBackOut::create(CCScaleTo::create(0.4f, 1.0f)), nullptr), nullptr));
     FMODAudioEngine::sharedEngine()->playEffect("achievement.mp3"_spr);
-    rachaSprite->runAction(CCSpawn::create(
-        CCFadeIn::create(0.4f),
-        CCEaseBackOut::create(CCScaleTo::create(0.4f, 1.0f)),
-        nullptr
-    ));
-    daysLabel->runAction(CCSequence::create(
-        CCDelayTime::create(0.2f),
-        CCSpawn::create(
-            CCFadeIn::create(0.4f),
-            CCEaseBackOut::create(CCScaleTo::create(0.4f, 1.0f)),
-            nullptr
-        ),
-        nullptr
-    ));
-    animLayer->runAction(CCSequence::create(
-        CCDelayTime::create(2.5f),
-        CCCallFunc::create(this, callfunc_selector(InfoPopup::onAnimationExit)),
-        nullptr
-    ));
+    animLayer->runAction(CCSequence::create(CCDelayTime::create(2.5f), CCCallFunc::create(this, callfunc_selector(InfoPopup::onAnimationExit)), nullptr));
 }
 
 void InfoPopup::onAnimationExit() {
-    auto animLayer = this->getChildByTag(111);
-    if (!animLayer) return;
-    animLayer->runAction(CCSequence::create(
-        CCFadeOut::create(0.5f),
-        CCRemoveSelf::create(),
-        nullptr
-    ));
+    auto animLayer = this->getChildByTag(111); if (!animLayer) return; animLayer->runAction(CCSequence::create(CCFadeOut::create(0.5f), CCRemoveSelf::create(), nullptr));
 }
 
+// --- onClose (Solo llama a la base) ---
+void InfoPopup::onClose(CCObject* sender) {
+    log::info("InfoPopup::onClose called");
+    // No necesitamos limpieza extra si replaceScene funciona bien
+    Popup<>::onClose(sender); // Llamada base ESENCIAL
+}
+
+// --- Método Create ---
 InfoPopup* InfoPopup::create() {
     auto ret = new InfoPopup();
-    if (ret && ret->initAnchored(260.f, 220.f)) { 
+    if (ret && ret->initAnchored(260.f, 220.f)) { // Ajusta el tamaño si es necesario
         ret->autorelease();
         return ret;
     }
