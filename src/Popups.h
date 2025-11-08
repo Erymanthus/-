@@ -3629,84 +3629,80 @@ protected:
         RoulettePopup::create()->show();
     }
 
-    // --- FUNCIONES DE ANIMACIÓN (Compatibles con iOS/macOS) ---
+    // --- FUNCIONES DE ANIMACIÓN (Versión limpia sin partículas) ---
 
     void showStreakAnimation(int streakLevel) {
         auto winSize = CCDirector::sharedDirector()->getWinSize();
 
+        // 1. Capa del Fondo (Solo se desvanece)
         auto bgLayer = CCLayerColor::create({ 0, 0, 0, 0 });
         bgLayer->setTag(110);
-        this->addChild(bgLayer, 1000);
+        this->addChild(bgLayer, 1000); // Z alto
         bgLayer->runAction(CCFadeTo::create(0.5f, 200));
 
+        // 2. Capa de Contenido (Se encogerá al final)
         auto contentLayer = CCLayer::create();
         contentLayer->setTag(111);
         contentLayer->ignoreAnchorPointForPosition(false);
         contentLayer->setAnchorPoint({ 0.5f, 0.5f });
         contentLayer->setPosition(winSize / 2);
         contentLayer->setContentSize(winSize);
-        this->addChild(contentLayer, 1001);
+        this->addChild(contentLayer, 1001); // Z más alto que el fondo
 
-        // SOLUCIÓN: Usar CCParticleSystemQuad en lugar de CCParticleSun
-        auto particles = CCParticleSystemQuad::createWithTotalParticles(150);
-        if (particles) {
-            particles->setDuration(1.5f);
-            particles->setPosition(winSize / 2);
-            particles->setPosVar({ 40.0f, 20.0f });
-            particles->setGravity({ 0, -100 });
-            particles->setSpeed(180);
-            particles->setSpeedVar(50);
-            particles->setAngle(90);
-            particles->setAngleVar(360);
-            particles->setLife(2.0f);
-            particles->setLifeVar(1.0f);
-            particles->setStartSize(10.0f);
-            particles->setStartSizeVar(5.0f);
-            particles->setEndSize(0.0f);
-            particles->setEmissionRate(150 / 1.5f);
-
-            // Configurar colores (usando ccColor4F)
-            particles->setStartColor(ccc4f(1.0f, 0.84f, 0.0f, 1.0f));
-            particles->setStartColorVar(ccc4f(0.0f, 0.0f, 0.0f, 0.0f));
-            particles->setEndColor(ccc4f(1.0f, 0.84f, 0.0f, 0.0f));
-            particles->setEndColorVar(ccc4f(0.0f, 0.0f, 0.0f, 0.0f));
-
-            particles->setBlendAdditive(false);
-            particles->setAutoRemoveOnFinish(true);
-
-            // Configurar texture
-            auto fireSprite = CCSprite::create("cuadro.png");
-            if (fireSprite && fireSprite->getTexture()) {
-                particles->setTexture(fireSprite->getTexture());
-            }
-            else {
-                auto defaultTex = CCSprite::createWithSpriteFrameName("GJ_circle_01_001.png");
-                if (defaultTex && defaultTex->getTexture()) {
-                    particles->setTexture(defaultTex->getTexture());
-                }
-            }
-            contentLayer->addChild(particles, 1);
-        }
-
-        // El resto del código permanece igual...
+        // --- Sprite de la Racha ---
         auto rachaSprite = CCSprite::create(g_streakData.getRachaSprite().c_str());
         if (rachaSprite) {
             rachaSprite->setPosition(winSize / 2);
             rachaSprite->setScale(0.0f);
             contentLayer->addChild(rachaSprite, 2);
-            rachaSprite->runAction(CCSequence::create(CCDelayTime::create(0.3f), CCEaseElasticOut::create(CCScaleTo::create(1.2f, 1.0f), 0.6f), nullptr));
-            rachaSprite->runAction(CCSequence::create(CCDelayTime::create(1.5f), CCRepeatForever::create(CCSequence::create(CCMoveBy::create(1.5f, { 0, 15.f }), CCMoveBy::create(1.5f, { 0, -15.f }), nullptr)), nullptr));
+
+            // Entrada elástica
+            rachaSprite->runAction(CCSequence::create(
+                CCDelayTime::create(0.3f),
+                CCEaseElasticOut::create(CCScaleTo::create(1.2f, 1.0f), 0.6f),
+                nullptr
+            ));
+
+            // Flotación continua suave
+            rachaSprite->runAction(CCSequence::create(
+                CCDelayTime::create(1.5f),
+                CCRepeatForever::create(CCSequence::create(
+                    CCMoveBy::create(1.5f, { 0, 15.f }),
+                    CCMoveBy::create(1.5f, { 0, -15.f }),
+                    nullptr
+                )),
+                nullptr
+            ));
         }
 
+        // --- Texto "Day X!" ---
         auto daysLabel = CCLabelBMFont::create(fmt::format("Day {}!", streakLevel).c_str(), "goldFont.fnt");
         daysLabel->setPosition({ winSize.width / 2, winSize.height / 2 - 100.f });
         daysLabel->setScale(0.0f);
         contentLayer->addChild(daysLabel, 2);
-        daysLabel->runAction(CCSequence::create(CCDelayTime::create(0.8f), CCEaseBackOut::create(CCScaleTo::create(0.5f, 1.0f)), nullptr));
 
+        daysLabel->runAction(CCSequence::create(
+            CCDelayTime::create(0.8f),
+            CCEaseBackOut::create(CCScaleTo::create(0.5f, 1.0f)),
+            nullptr
+        ));
+
+        // --- Sonidos y Salida Programada ---
         FMODAudioEngine::sharedEngine()->playEffect("achievement.mp3"_spr);
-        contentLayer->runAction(CCSequence::create(CCDelayTime::create(0.5f), CCCallFunc::create(this, callfunc_selector(InfoPopup::playExtraStreakSound)), nullptr));
-        contentLayer->runAction(CCSequence::create(CCDelayTime::create(6.0f), CCCallFunc::create(this, callfunc_selector(InfoPopup::onAnimationExit)), nullptr));
+
+        // Sonido extra a los 0.5s
+        contentLayer->runAction(CCSequence::create(
+            CCDelayTime::create(0.5f),
+            CCCallFunc::create(this, callfunc_selector(InfoPopup::playExtraStreakSound)),
+            nullptr
+        ));
+
+        // Salida a los 6.0s
+        contentLayer->runAction(CCSequence::create(
+            CCDelayTime::create(6.0f),
+            CCCallFunc::create(this, callfunc_selector(InfoPopup::onAnimationExit)),
+            nullptr
+        ));
     }
 
     void playExtraStreakSound() {
@@ -3714,7 +3710,6 @@ protected:
     }
 
     void onAnimationExit() {
-        // 1. Desvanecer el fondo
         if (auto bgLayer = this->getChildByTag(110)) {
             bgLayer->runAction(CCSequence::create(
                 CCFadeOut::create(0.5f),
@@ -3722,7 +3717,6 @@ protected:
                 nullptr
             ));
         }
-        // 2. Encoger y desvanecer el contenido
         if (auto contentLayer = this->getChildByTag(111)) {
             contentLayer->runAction(CCSequence::create(
                 CCSpawn::create(
