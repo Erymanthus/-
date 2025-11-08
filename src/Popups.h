@@ -3281,24 +3281,19 @@ protected:
             }
 
             std::string roleTag = "";
-            std::string nameTag = "<cw>"; // Por defecto blanco para usuarios normales
+            std::string nameTag = "<cw>";
 
             if (role == 2) {
                 roleTag = "<cr>[ADMIN]</c> ";
-                nameTag = "<cr>"; // Rojo para admin
+                nameTag = "<cr>";
             }
             else if (role == 1) {
                 roleTag = "<co>[MOD]</c> ";
-                nameTag = "<co>"; // Naranja para mod
+                nameTag = "<co>";
             }
 
-          
             std::string fullText = fmt::format("{0}{1}{2}</c>: {3}", roleTag, nameTag, username, content);
-
-            
             auto textArea = TextArea::create(fullText, "chatFont.fnt", 0.6f, 270.f, { 0, 1 }, 8.f, false);
-
-           
             textArea->setColor({ 255, 255, 255 });
 
             msgNodes.push_back(textArea);
@@ -3317,8 +3312,9 @@ protected:
         }
 
         if (m_newestMessageTime > 0) {
-            CCUserDefault::sharedUserDefault()->setDoubleForKey("streak_last_chat_time", (double)m_newestMessageTime);
-            CCUserDefault::sharedUserDefault()->flush();
+            // --- CORRECCIÓN PARA MACOS ARM64 ---
+            // Usamos el sistema de guardado de Geode en lugar de CCUserDefault
+            Mod::get()->setSavedValue<double>("streak_last_chat_time", (double)m_newestMessageTime);
         }
     }
 
@@ -3617,7 +3613,7 @@ protected:
         std::string message =
             "Complete rated levels every day to earn <cp>Streak Points</c> and increase your streak!\n\n"
             "<cg>Point Rewards:</c>\n"
-            "- <cy>Auto / Easy / Normal</c> (1-3⭐): <cl>1 Point</c>\n"
+            "- <cy>Auto/Easy/Normal</c> (1-3⭐): <cl>1 Point</c>\n"
             "- <co>Hard</c> (4-5): <cl>3 Points</c>\n"
             "- <cr>Harder</c> (6-7): <cl>4 Points</c>\n"
             "- <cp>Insane</c> (8-9): <cl>5 Points</c>\n"
@@ -3633,123 +3629,91 @@ protected:
         RoulettePopup::create()->show();
     }
 
-    // --- Animación de Racha MEJORADA (Versión Final) ---
     void showStreakAnimation(int streakLevel) {
         auto winSize = CCDirector::sharedDirector()->getWinSize();
 
-        // 1. Capa del Fondo (Solo se desvanece, NO se encoge)
         auto bgLayer = CCLayerColor::create({ 0, 0, 0, 0 });
-        bgLayer->setTag(110); // Tag diferente para el fondo
-        this->addChild(bgLayer, 1000); // Z alto
+        bgLayer->setTag(110);
+        this->addChild(bgLayer, 1000);
         bgLayer->runAction(CCFadeTo::create(0.5f, 200));
 
-        // 2. Capa de Contenido (Esta SÍ se encogerá al final)
         auto contentLayer = CCLayer::create();
-        contentLayer->setTag(111); // Tag original para el contenido
-        // Importante: poner el anchor point en el centro para que se encoja hacia el medio
+        contentLayer->setTag(111);
         contentLayer->ignoreAnchorPointForPosition(false);
         contentLayer->setAnchorPoint({ 0.5f, 0.5f });
         contentLayer->setPosition(winSize / 2);
-        contentLayer->setContentSize(winSize); // Para que sus hijos relativos funcionen bien
-        this->addChild(contentLayer, 1001); // Z más alto que el fondo
+        contentLayer->setContentSize(winSize);
+        this->addChild(contentLayer, 1001);
 
-        // --- A partir de aquí, añadimos todo al contentLayer en lugar de animLayer ---
+        // CORRECCIÓN 1: Usar CCParticleSun y reconfigurar (más compatible que Fireworks o createWithTotalParticles)
+        auto particles = CCParticleSun::create();
+        if (particles) {
+            particles->setTotalParticles(150); // Establecer cantidad después de crear
+            particles->setDuration(1.5f);
+            particles->setPosition(winSize / 2);
+            particles->setPosVar({ 40.0f, 20.0f });
+            particles->setGravity({ 0, -100 });
+            particles->setSpeed(180);
+            particles->setSpeedVar(50);
+            particles->setAngle(90);
+            particles->setAngleVar(360);
+            particles->setLife(2.0f);
+            particles->setLifeVar(1.0f);
+            particles->setStartSize(10.0f);
+            particles->setStartSizeVar(5.0f);
+            particles->setEndSize(0.0f);
+            particles->setEmissionRate(150 / 1.5f);
+            particles->setStartColor({ 1.0f, 0.84f, 0.0f, 1.0f });
+            particles->setStartColorVar({ 0.0f, 0.0f, 0.0f, 0.0f });
+            particles->setEndColor({ 1.0f, 0.84f, 0.0f, 0.0f });
+            particles->setEndColorVar({ 0.0f, 0.0f, 0.0f, 0.0f });
+            particles->setAutoRemoveOnFinish(true);
 
-        // Partículas (Confeti)
-        auto particles = CCParticleFireworks::create();
-        particles->setDuration(1.5f);
-        particles->setPosition(winSize / 2); // Centro del contentLayer
-        particles->setGravity({ 0, -100 });
-        particles->setSpeed(180);
-        particles->setSpeedVar(50);
-        particles->setStartColor({ 255, 215, 0, 255 }); // Dorado
-        particles->setStartColorVar({ 50, 50, 50, 0 });
-        particles->setEndColor({ 255, 255, 255, 0 });   // Transparente al final
-        particles->setEndColorVar({ 50, 50, 50, 0 });
-        particles->setAutoRemoveOnFinish(true);
-        contentLayer->addChild(particles, 1);
+            // CORRECCIÓN 2: Evitar CCTextureCache::addImage
+            auto fireSprite = CCSprite::create("fire.png");
+            if (fireSprite && fireSprite->getTexture()) {
+                particles->setTexture(fireSprite->getTexture());
+            }
+            else {
+                // Fallback a una textura por defecto del juego si fire.png no existe
+                auto defaultTex = CCSprite::createWithSpriteFrameName("GJ_circle_01_001.png");
+                if (defaultTex && defaultTex->getTexture()) {
+                    particles->setTexture(defaultTex->getTexture());
+                }
+            }
+            contentLayer->addChild(particles, 1);
+        }
 
-        // Sprite de la Racha
         auto rachaSprite = CCSprite::create(g_streakData.getRachaSprite().c_str());
         if (rachaSprite) {
             rachaSprite->setPosition(winSize / 2);
             rachaSprite->setScale(0.0f);
             contentLayer->addChild(rachaSprite, 2);
-
-            // Entrada elástica
-            auto entryAction = CCSequence::create(
-                CCDelayTime::create(0.3f),
-                CCEaseElasticOut::create(CCScaleTo::create(1.2f, 1.0f), 0.6f),
-                nullptr
-            );
-            rachaSprite->runAction(entryAction);
-
-            // Flotación suave continua
-            auto floatAction = CCRepeatForever::create(CCSequence::create(
-                CCMoveBy::create(1.5f, { 0, 15.f }),
-                CCMoveBy::create(1.5f, { 0, -15.f }),
-                nullptr
-            ));
-            rachaSprite->runAction(CCSequence::create(CCDelayTime::create(1.5f), floatAction, nullptr));
+            rachaSprite->runAction(CCSequence::create(CCDelayTime::create(0.3f), CCEaseElasticOut::create(CCScaleTo::create(1.2f, 1.0f), 0.6f), nullptr));
+            rachaSprite->runAction(CCSequence::create(CCDelayTime::create(1.5f), CCRepeatForever::create(CCSequence::create(CCMoveBy::create(1.5f, { 0, 15.f }), CCMoveBy::create(1.5f, { 0, -15.f }), nullptr)), nullptr));
         }
 
-        // Texto "Day X!"
         auto daysLabel = CCLabelBMFont::create(fmt::format("Day {}!", streakLevel).c_str(), "goldFont.fnt");
         daysLabel->setPosition({ winSize.width / 2, winSize.height / 2 - 100.f });
         daysLabel->setScale(0.0f);
         contentLayer->addChild(daysLabel, 2);
+        daysLabel->runAction(CCSequence::create(CCDelayTime::create(0.8f), CCEaseBackOut::create(CCScaleTo::create(0.5f, 1.0f)), nullptr));
 
-        daysLabel->runAction(CCSequence::create(
-            CCDelayTime::create(0.8f),
-            CCEaseBackOut::create(CCScaleTo::create(0.5f, 1.0f)),
-            nullptr
-        ));
-
-        // Sonidos y programación de salida
         FMODAudioEngine::sharedEngine()->playEffect("achievement.mp3"_spr);
-
-        // Sonido extra programado
-        contentLayer->runAction(CCSequence::create(
-            CCDelayTime::create(0.5f),
-            CCCallFunc::create(this, callfunc_selector(InfoPopup::playExtraStreakSound)),
-            nullptr
-        ));
-
-        // Salida programada a los 6 segundos
-        contentLayer->runAction(CCSequence::create(
-            CCDelayTime::create(6.0f),
-            CCCallFunc::create(this, callfunc_selector(InfoPopup::onAnimationExit)),
-            nullptr
-        ));
+        contentLayer->runAction(CCSequence::create(CCDelayTime::create(0.5f), CCCallFunc::create(this, callfunc_selector(InfoPopup::playExtraStreakSound)), nullptr));
+        contentLayer->runAction(CCSequence::create(CCDelayTime::create(6.0f), CCCallFunc::create(this, callfunc_selector(InfoPopup::onAnimationExit)), nullptr));
     }
 
-    // Función auxiliar para el sonido extra
     void playExtraStreakSound() {
         FMODAudioEngine::sharedEngine()->playEffect("mcsfx.mp3"_spr);
     }
 
-    // Animación de salida: Fondo se desvanece, Contenido se encoge
     void onAnimationExit() {
-        // 1. Desvanecer el fondo (Tag 110)
         if (auto bgLayer = this->getChildByTag(110)) {
-            bgLayer->runAction(CCSequence::create(
-                CCFadeOut::create(0.5f),
-                CCRemoveSelf::create(),
-                nullptr
-            ));
+            bgLayer->runAction(CCSequence::create(CCFadeOut::create(0.5f), CCRemoveSelf::create(), nullptr));
         }
-
-        // 2. Encoger el contenido (Tag 111)
         if (auto contentLayer = this->getChildByTag(111)) {
-            contentLayer->runAction(CCSequence::create(
-                CCSpawn::create(
-                    CCFadeOut::create(0.5f),
-                    CCEaseBackIn::create(CCScaleTo::create(0.5f, 0.0f)),
-                    nullptr
-                ),
-                CCRemoveSelf::create(),
-                nullptr
-            ));
+            contentLayer->runAction(CCSequence::create(CCSpawn::create(CCFadeOut::create(0.5f), CCEaseBackIn::create(CCScaleTo::create(0.5f, 0.0f)), nullptr), CCRemoveSelf::create(), nullptr));
         }
     }
 
