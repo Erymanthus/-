@@ -5,16 +5,15 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <set> // <-- Añadir include para std::set
+#include <set> 
 #include <iomanip>
 #include <sstream>
-// Quitar "FirebaseManager.h" de aquí si no se usa directamente en este archivo.
-// #include "FirebaseManager.h"
+
 
 using namespace geode::prelude;
 
 struct StreakData {
-    // --- Variables existentes ---
+    
     int currentStreak;
     int streakPointsToday;
     int totalStreakPoints;
@@ -24,8 +23,9 @@ struct StreakData {
     int superStars;
     int lastRouletteIndex;
     int totalSpins;
+    int lastStreakAnimated = 0;
     int starTickets;
-    std::vector<int> streakCompletedLevels; // ¿Todavía usas esto? Si no, se puede borrar.
+    std::vector<int> streakCompletedLevels;
     std::map<std::string, int> streakPointsHistory;
     bool pointMission1Claimed;
     bool pointMission2Claimed;
@@ -35,8 +35,10 @@ struct StreakData {
     bool pointMission6Claimed;
     bool isDataLoaded;
     bool m_initialized = false;
+    int userRole = 0;          // 0=Usuario, 1=Moderador, 2=Admin
+    int dailyMsgCount = 0;     // Contador de mensajes enviados hoy (para mods)
 
-    // --- NUEVO: Contenedor para misiones de nivel completadas ---
+    
     std::set<int> completedLevelMissions;
 
     enum class BadgeCategory {
@@ -52,7 +54,7 @@ struct StreakData {
         bool isFromRoulette;
     };
 
-    // --- Tu lista de insignias (asegúrate de que estén todas) ---
+    
     std::vector<BadgeInfo> badges = {
         {5, "reward5.png"_spr, "First Steps", BadgeCategory::COMMON, "badge_5", false},
         {10, "reward10.png"_spr, "Shall We Continue?", BadgeCategory::COMMON, "badge_10", false},
@@ -63,7 +65,7 @@ struct StreakData {
         {150, "reward150.png"_spr, "150 Days!!!", BadgeCategory::LEGENDARY, "badge_150", false},
         {300, "reward300.png"_spr, "300 Days!!!", BadgeCategory::LEGENDARY, "badge_300", false},
         {365, "reward1year.png"_spr, "1 Year!!!", BadgeCategory::MYTHIC, "badge_365", false},
-        // Insignias de Ruleta/Tienda/Nivel
+       
         {0, "badge_beta.png"_spr, "Player beta?", BadgeCategory::COMMON, "beta_badge", true},
         {0, "badge_platino.png"_spr, "platino badge", BadgeCategory::COMMON, "platino_streak_badge", true},
         {0, "badge_diamante_gd.png"_spr, "GD Diamond!", BadgeCategory::COMMON, "diamante_gd_badge", true},
@@ -71,7 +73,7 @@ struct StreakData {
         {0, "dark_badge1.png"_spr, "dark side", BadgeCategory::EPIC, "dark_streak_badge", true},
         {0, "badge_diamante_mc.png"_spr, "Minecraft Diamond!", BadgeCategory::EPIC, "diamante_mc_badge", true},
         {0, "gold_streak.png"_spr, "Gold Legend's", BadgeCategory::LEGENDARY, "gold_streak_badge", true},
-        {0, "super_star.png"_spr, "First Mythic", BadgeCategory::MYTHIC, "super_star_badge", true},
+        {0, "super_star_badge.png"_spr, "First Mythic", BadgeCategory::MYTHIC, "super_star_badge", true},
         {0, "magic_flower_badge.png"_spr, "hypnotizes with its beauty", BadgeCategory::MYTHIC, "magic_flower_badge", true},
         {0, "hounter_badge.png"_spr, "looks familiar to me", BadgeCategory::SPECIAL, "hounter_badge", true },
         {0, "gd_badge.png"_spr, "GD!", BadgeCategory::COMMON, "gd_badge", true },
@@ -90,6 +92,14 @@ struct StreakData {
         {0, "miku_badge.png"_spr, "Miku Miku oooeeooo", BadgeCategory::EPIC, "miku_badge", true },
         {0, "nantendo_badge.png"_spr, "Nintendo bruh", BadgeCategory::COMMON, "nantendo_badge", true },
 
+		{0, "Frostbite_badge.png"_spr, "By La Fluffaroni", BadgeCategory::SPECIAL, "Frostbite_badge", true },
+		{0, "Skybound_badge.png"_spr, "By La Fluffaroni", BadgeCategory::EPIC, "Skybound_badge", true },
+		{0, "Steampunk_Dash_badge.png"_spr, "By La Fluffaroni", BadgeCategory::COMMON, "Steampunk_Dash_badge", true },
+		{0, "money_badge.png"_spr, "By La Fluffaroni", BadgeCategory::SPECIAL, "money_badge", true },
+		{0, "Skeletal_Shenanigans_badge.png"_spr, "By Fluffaroni", BadgeCategory::LEGENDARY, "Skeletal_Shenanigans_badge",true}
+
+
+
 
     };
 
@@ -99,22 +109,23 @@ struct StreakData {
         return m_initialized && isDataLoaded;
     }
 
-    // Funciones
+   
     void parseServerResponse(const matjson::Value& data);
     void resetToDefault();
-    void load(); // Sigue vacía
+    void load();
     void save();
     int getRequiredPoints();
     int getTicketValueForRarity(BadgeCategory category);
-    void unlockBadge(const std::string& badgeID); // Actualiza estado local
+    void unlockBadge(const std::string& badgeID); 
     std::string getCurrentDate();
     void unequipBadge();
     bool isBadgeEquipped(const std::string& badgeID);
     void dailyUpdate();
-    void checkRewards(); // Desbloquea insignias de racha
+    void checkRewards();
     void addPoints(int count);
     bool shouldShowAnimation();
     std::string getRachaSprite();
+    std::string getRachaSprite(int streak);
     std::string getCategoryName(BadgeCategory category);
     ccColor3B getCategoryColor(BadgeCategory category);
     BadgeInfo* getBadgeInfo(const std::string& badgeID);
@@ -122,9 +133,9 @@ struct StreakData {
     void equipBadge(const std::string& badgeID);
     BadgeInfo* getEquippedBadge();
 
-    // --- NUEVO: Función para comprobar misión de nivel ---
+   
     bool isLevelMissionClaimed(int levelID) const;
 };
 
-// Declaración externa de la variable global
+
 extern StreakData g_streakData;

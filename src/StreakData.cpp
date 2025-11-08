@@ -6,6 +6,9 @@
 #include <ctime>
 #include <cmath>
 #include <stdexcept> // Para std::stoi excepciones
+#include <Geode/binding/GJAccountManager.hpp> // Necesario para el truco de admin temporal
+#include <algorithm> // Necesario para std::transform (convertir a minúsculas)
+#include <cctype>    // Necesario para std::tolower
 
 // Definición de la variable global (importante)
 StreakData g_streakData;
@@ -20,6 +23,7 @@ void StreakData::resetToDefault() {
     lastDay = "";
     equippedBadge = "";
     superStars = 0;
+    lastStreakAnimated = 0;
     starTickets = 0;
     lastRouletteIndex = 0;
     totalSpins = 0;
@@ -39,12 +43,18 @@ void StreakData::resetToDefault() {
         std::fill(unlockedBadges.begin(), unlockedBadges.end(), false);
     }
     completedLevelMissions.clear(); // <-- Resetear misiones de nivel
+
+    // --- NUEVO: Resetear roles y contadores ---
+    userRole = 0;       // Reset a usuario normal por defecto
+    dailyMsgCount = 0;  // Resetear contador de mensajes
+    // ------------------------------------------
+
     isDataLoaded = false;
     m_initialized = false;
 }
 
 void StreakData::load() {
-    // Vacía a propósito - la carga real es en MenuLayer
+    // Vacía a propósito - la carga real es en MenuLayer/AccountWatcher
 }
 
 void StreakData::save() {
@@ -54,6 +64,7 @@ void StreakData::save() {
 
 void StreakData::parseServerResponse(const matjson::Value& data) {
     currentStreak = data["current_streak_days"].as<int>().unwrapOr(0);
+    lastStreakAnimated = data["last_streak_animated"].as<int>().unwrapOr(0); // <--- AÑADE ESTO
     totalStreakPoints = data["total_streak_points"].as<int>().unwrapOr(0);
     equippedBadge = data["equipped_badge_id"].as<std::string>().unwrapOr("");
     superStars = data["super_stars"].as<int>().unwrapOr(0);
@@ -62,6 +73,35 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
     totalSpins = data["total_spins"].as<int>().unwrapOr(0);
     lastDay = data["last_day"].as<std::string>().unwrapOr("");
     streakPointsToday = data["streakPointsToday"].as<int>().unwrapOr(0);
+
+    // --- NUEVO: Cargar Rol Inteligente (Texto o Número) ---
+   // --- NUEVO: Cargar Rol Inteligente ---
+    userRole = 0; // Por defecto
+    if (data.contains("role")) {
+        if (data["role"].isString()) {
+            std::string roleStr = data["role"].as<std::string>().unwrapOr("");
+            // Convertir a minúsculas
+            std::transform(roleStr.begin(), roleStr.end(), roleStr.begin(),
+                [](unsigned char c) { return std::tolower(c); });
+
+            if (roleStr == "admin" || roleStr == "administrator") userRole = 2;
+            else if (roleStr == "moderator" || roleStr == "mod") userRole = 1;
+        }
+        else if (data["role"].isNumber()) {
+            userRole = data["role"].as<int>().unwrapOr(0);
+        }
+    }
+
+    // Cargar contador de mensajes diarios
+    dailyMsgCount = data["daily_msg_count"].as<int>().unwrapOr(0);
+
+    // --- TRUCO TEMPORAL PARA PRUEBAS (¡BORRAR LUEGO!) ---
+    // Esto te asegura ser admin mientras pruebas, aunque tu DB diga lo contrario.
+    if (GJAccountManager::sharedState()->m_accountID == 24453544) {
+        userRole = 2;
+        log::info("DEV MODE: Forced ADMIN role for testing.");
+    }
+    // ----------------------------------------------------
 
     // Cargar insignias desbloqueadas
     if (unlockedBadges.size() != badges.size()) { // Asegurar tamaño
@@ -74,16 +114,12 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
         auto badgesResult = data["unlocked_badges"].as<std::vector<matjson::Value>>();
         if (badgesResult.isOk()) {
             for (const auto& badge_id_json : badgesResult.unwrap()) {
-                // Llamar a unlockBadge para actualizar el estado local (sin guardar)
                 unlockBadge(badge_id_json.as<std::string>().unwrapOr(""));
             }
         }
         else {
             log::warn("Could not parse 'unlocked_badges' as array.");
         }
-    }
-    else {
-        // log::info("No 'unlocked_badges' field found in server response."); // Opcional
     }
 
     // Cargar estado de misiones diarias
@@ -120,46 +156,32 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
     }
 
     // --- Cargar Misiones de Nivel Completadas ---
-    completedLevelMissions.clear(); // Limpiar antes de cargar
+    completedLevelMissions.clear();
     if (data.contains("completedLevelMissions")) {
         auto missionsResult = data["completedLevelMissions"].as<std::map<std::string, matjson::Value>>();
         if (missionsResult.isOk()) {
             for (const auto& [levelIDStr, _] : missionsResult.unwrap()) {
                 try {
-                    // Convertir la clave (string) de vuelta a int
                     completedLevelMissions.insert(std::stoi(levelIDStr));
                 }
-                catch (const std::invalid_argument& e) {
-                    log::warn("Error al convertir ID '{}' de misión completada: {}", levelIDStr, e.what());
-                }
-                catch (const std::out_of_range& e) {
-                    log::warn("Error al convertir ID '{}' (fuera de rango) de misión completada: {}", levelIDStr, e.what());
+                catch (const std::exception& e) {
+                    log::warn("Error al convertir ID '{}': {}", levelIDStr, e.what());
                 }
             }
-            log::info("Loaded {} completed level missions from server.", completedLevelMissions.size());
-        }
-        else {
-            log::warn("Could not parse 'completedLevelMissions' as object from server.");
+            log::info("Loaded {} completed level missions.", completedLevelMissions.size());
         }
     }
-    else {
-        // log::info("No 'completedLevelMissions' field found in server data."); // Opcional
-    }
-    // --- Fin Carga Misiones Nivel ---
 
-    // Llamar a checkRewards DESPUÉS de cargar todo, incluyendo currentStreak y unlockedBadges
+    // Llamar a checkRewards DESPUÉS de cargar todo
     this->checkRewards();
 
     isDataLoaded = true;
     m_initialized = true;
 }
 
-// --- Implementación de isLevelMissionClaimed ---
 bool StreakData::isLevelMissionClaimed(int levelID) const {
-    // Comprueba si el ID del nivel existe en el set
     return completedLevelMissions.count(levelID) > 0;
 }
-// --- Fin Implementación ---
 
 int StreakData::getRequiredPoints() {
     if (currentStreak >= 80) return 10;
@@ -185,17 +207,14 @@ int StreakData::getTicketValueForRarity(BadgeCategory category) {
     }
 }
 
-// Actualiza solo el estado local
 void StreakData::unlockBadge(const std::string& badgeID) {
     if (badgeID.empty()) return;
-    // Asegurar tamaño correcto antes de modificar
     if (unlockedBadges.size() != badges.size()) {
         unlockedBadges.assign(badges.size(), false);
     }
     for (size_t i = 0; i < badges.size(); ++i) {
-        // Comprobar índice antes de acceder
         if (i < unlockedBadges.size() && badges[i].badgeID == badgeID) {
-            unlockedBadges[i] = true; // Marcar como desbloqueado localmente
+            unlockedBadges[i] = true;
             return;
         }
     }
@@ -207,221 +226,172 @@ std::string StreakData::getCurrentDate() {
     tm* now = localtime(&t);
     if (!now) {
         log::error("Failed to get current local time.");
-        return ""; // Devolver string vacío en error
+        return "";
     }
     char buf[16];
-    // Usar %F (YYYY-MM-DD)
     if (strftime(buf, sizeof(buf), "%F", now) == 0) {
         log::error("Failed to format current date.");
-        return ""; // Devolver string vacío en error
+        return "";
     }
     return std::string(buf);
 }
 
 void StreakData::unequipBadge() {
-    if (!equippedBadge.empty()) { // Solo guardar si cambia
+    if (!equippedBadge.empty()) {
         equippedBadge = "";
         save();
     }
 }
 
 bool StreakData::isBadgeEquipped(const std::string& badgeID) {
-    // Comprobar si badgeID no está vacío antes de comparar
     return !badgeID.empty() && equippedBadge == badgeID;
 }
 
 void StreakData::dailyUpdate() {
     time_t now_t = time(nullptr);
     std::string today = getCurrentDate();
-    if (today.empty()) {
-        log::error("dailyUpdate: Failed to get current date, aborting daily update.");
-        return; // No continuar si no podemos obtener la fecha
-    }
+    if (today.empty()) return;
 
     if (lastDay.empty()) {
-        log::info("dailyUpdate: First run or data reset. Setting lastDay to today.");
         lastDay = today;
         streakPointsToday = 0;
-        // No guardamos aquí, solo inicializamos. Se guardará al añadir puntos.
+        dailyMsgCount = 0;
         return;
     }
 
-    if (lastDay == today) return; // Mismo día, no hacer nada
+    if (lastDay == today) return;
 
-    // --- Parseo Seguro de lastDay ---
     tm last_tm = {};
     std::stringstream ss(lastDay);
-    // Usar >> std::get_time
     ss >> std::get_time(&last_tm, "%Y-%m-%d");
 
-    // Comprobar si el parseo falló
     if (ss.fail() || ss.bad()) {
-        log::error("dailyUpdate: Failed to parse lastDay '{}'. Resetting day.", lastDay);
         lastDay = today;
         streakPointsToday = 0;
+        dailyMsgCount = 0;
         pointMission1Claimed = false; pointMission2Claimed = false; pointMission3Claimed = false;
         pointMission4Claimed = false; pointMission5Claimed = false; pointMission6Claimed = false;
-        save(); // Guardar el estado reseteado
+        save();
         return;
     }
 
-    // Intentar obtener time_t
-    last_tm.tm_isdst = -1; // Dejar que mktime determine DST
+    last_tm.tm_isdst = -1;
     time_t last_t = mktime(&last_tm);
 
-    // Comprobar si mktime falló
     if (last_t == -1) {
-        log::error("dailyUpdate: Failed to convert last_tm ('{}') to time_t. Resetting day.", lastDay);
         lastDay = today;
         streakPointsToday = 0;
+        dailyMsgCount = 0;
         pointMission1Claimed = false; pointMission2Claimed = false; pointMission3Claimed = false;
         pointMission4Claimed = false; pointMission5Claimed = false; pointMission6Claimed = false;
-        save(); // Guardar el estado reseteado
+        save();
         return;
     }
-    // --- Fin Parseo Seguro ---
 
     double seconds_passed = difftime(now_t, last_t);
-    const double seconds_in_day = 86400.0; // 60*60*24
-    // double days_passed = floor(seconds_passed / seconds_in_day); // Ya no necesitamos floor
+    const double seconds_in_day = 86400.0;
 
     bool streak_should_be_lost = false;
     bool showAlert = false;
-    bool needsSave = false; // Bandera para decidir si guardar al final
+    bool needsSave = false;
 
-    // Comprobar si han pasado >= 48 horas (2 días completos)
     if (seconds_passed >= 2.0 * seconds_in_day) {
-        log::info("dailyUpdate: >= 48 hours passed. Streak lost.");
         streak_should_be_lost = true;
     }
-    // Comprobar si han pasado >= 24 horas pero < 48 horas
     else if (seconds_passed >= 1.0 * seconds_in_day) {
-        log::info("dailyUpdate: >= 24 hours passed. Checking previous day's requirement.");
-        // Comprobar si se cumplió la racha del día ANTERIOR
         if (streakPointsToday < getRequiredPoints()) {
-            log::info("dailyUpdate: Previous day's streak NOT met. Streak lost.");
             streak_should_be_lost = true;
         }
-        else {
-            log::info("dailyUpdate: Previous day's streak met. Streak continues.");
-        }
-    }
-    else {
-        // Menos de 24h, pero la fecha cambió (ej. justo después de medianoche)
-        log::info("dailyUpdate: < 24 hours passed, but date changed. Resetting daily counters.");
-        // No se pierde la racha aquí, solo se resetean contadores diarios
     }
 
-    // Aplicar pérdida de racha si es necesario
     if (streak_should_be_lost && currentStreak > 0) {
-        log::info("dailyUpdate: Resetting streak from {} to 0.", currentStreak);
         currentStreak = 0;
-        streakPointsHistory.clear(); // Limpiar historial al perder racha
-        // totalStreakPoints = 0; // Opcional: ¿Resetear puntos totales?
+        lastStreakAnimated = 0;
+        streakPointsHistory.clear();
         showAlert = true;
-        needsSave = true; // Marcar para guardar
+        needsSave = true;
     }
 
-    // Siempre resetear contadores diarios si la fecha cambió
-    log::info("dailyUpdate: Resetting daily points and missions for new day: {}", today);
+    // Reseteo diario (incluyendo contador de mensajes)
     streakPointsToday = 0;
+    dailyMsgCount = 0;
     lastDay = today;
     pointMission1Claimed = false; pointMission2Claimed = false; pointMission3Claimed = false;
     pointMission4Claimed = false; pointMission5Claimed = false; pointMission6Claimed = false;
-    needsSave = true; // Marcar que necesitamos guardar el reseteo diario
+    needsSave = true;
 
-    // Guardar en el servidor si hubo cambios
     if (needsSave) {
-        log::info("dailyUpdate: Saving updated daily state.");
-        updatePlayerDataInFirebase(); // Llamar a la función que usa POST /players/:id
+        updatePlayerDataInFirebase();
     }
 
-    // Mostrar alerta si se perdió la racha (en el hilo principal)
     if (showAlert) {
         Loader::get()->queueInMainThread([=]() {
-            if (auto scene = CCDirector::sharedDirector()->getRunningScene()) {
-                FLAlertLayer::create("Streak Lost", "You missed a day!", "OK")->show();
-            }
-            else {
-                log::warn("dailyUpdate: Tried to show streak lost alert, but no scene running.");
-            }
+            FLAlertLayer::create("Streak Lost", "You missed a day!", "OK")->show();
             });
     }
 }
 
 void StreakData::checkRewards() {
     bool changed = false;
-    // Asegurarse de que el vector tenga el tamaño correcto antes de iterar/escribir
     if (unlockedBadges.size() != badges.size()) {
         unlockedBadges.assign(badges.size(), false);
     }
 
     for (size_t i = 0; i < badges.size(); i++) {
-        // Comprobar índice (aunque assign debería garantizarlo)
         if (i >= unlockedBadges.size()) continue;
-
-        // Saltar insignias de ruleta y las ya desbloqueadas
         if (badges[i].isFromRoulette || unlockedBadges[i]) continue;
 
-        // Si cumple los días requeridos y no estaba desbloqueada
         if (currentStreak >= badges[i].daysRequired) {
-            log::info("checkRewards: Unlocking badge '{}' locally for reaching {} days.", badges[i].badgeID, badges[i].daysRequired);
             unlockedBadges[i] = true;
             changed = true;
         }
     }
-    // Guardar SOLO si se desbloqueó alguna insignia nueva
     if (changed) {
-        log::info("checkRewards: New streak badges unlocked, saving state.");
         save();
     }
 }
 
-void StreakData::addPoints(int count) {
-    if (count <= 0) return; // Ignorar puntos no positivos
+// En StreakData.cpp
 
-    dailyUpdate(); // Asegurarse de que el día esté actualizado
+void StreakData::addPoints(int count) {
+    if (count <= 0) return;
+
+    dailyUpdate();
 
     int currentRequired = getRequiredPoints();
-    bool alreadyHadStreakToday = (streakPointsToday >= currentRequired);
+
+    // --- CORRECCIÓN CRÍTICA AQUÍ ---
+    // Verificamos si YA tenías la meta cumplida ANTES de sumar los nuevos puntos.
+    bool alreadyReachedGoalToday = (streakPointsToday >= currentRequired);
 
     streakPointsToday += count;
     totalStreakPoints += count;
 
     std::string today = getCurrentDate();
-    if (!today.empty()) { // Solo actualizar historial si la fecha es válida
+    if (!today.empty()) {
         streakPointsHistory[today] = streakPointsToday;
     }
-    else {
-        log::error("addPoints: Could not get current date to update history.");
-    }
 
-    // Comprobar si JUSTO AHORA se alcanzó el requisito
-    bool justCompletedStreak = (!alreadyHadStreakToday && streakPointsToday >= currentRequired);
-
-    if (justCompletedStreak) {
+    // Solo activamos la nueva racha si NO la tenías antes Y AHORA SÍ la tienes.
+    if (!alreadyReachedGoalToday && streakPointsToday >= currentRequired) {
         currentStreak++;
-        hasNewStreak = true; // Marcar para la animación
-        log::info("addPoints: Streak requirement met! New streak: {}. Checking rewards.", currentStreak);
-        checkRewards(); // Comprobar recompensas de racha inmediatamente
+        hasNewStreak = true;
+        checkRewards();
     }
-    else {
-        // log::info("addPoints: Added {} points. Today: {}, Required: {}. Streak: {}", count, streakPointsToday, currentRequired, currentStreak); // Log opcional
-    }
+    // -------------------------------
 
-    save(); // Guardar los puntos añadidos y el posible aumento de racha
+    save();
 }
 
 bool StreakData::shouldShowAnimation() {
-    if (hasNewStreak) {
-        hasNewStreak = false; // Resetear la bandera después de consultarla
-        return true;
+    // Si tenemos racha Y es mayor que la última que celebramos...
+    if (currentStreak > 0 && currentStreak > lastStreakAnimated) {
+        return true; // ...mostramos la animación.
     }
     return false;
 }
 
-std::string StreakData::getRachaSprite() {
-    int streak = currentStreak; // Usar copia local
+std::string StreakData::getRachaSprite(int streak) {
     if (streak >= 80) return "racha9.png"_spr;
     if (streak >= 70) return "racha8.png"_spr;
     if (streak >= 60) return "racha7.png"_spr;
@@ -432,6 +402,10 @@ std::string StreakData::getRachaSprite() {
     if (streak >= 10) return "racha2.png"_spr;
     if (streak >= 1)  return "racha1.png"_spr;
     return "racha0.png"_spr;
+}
+
+std::string StreakData::getRachaSprite() {
+    return getRachaSprite(this->currentStreak);
 }
 
 std::string StreakData::getCategoryName(BadgeCategory category) {
@@ -446,7 +420,6 @@ std::string StreakData::getCategoryName(BadgeCategory category) {
 }
 
 ccColor3B StreakData::getCategoryColor(BadgeCategory category) {
-    // Usar inicializadores de lista {} para ccc3
     switch (category) {
     case BadgeCategory::COMMON: return { 200, 200, 200 };
     case BadgeCategory::SPECIAL: return { 0, 170, 0 };
@@ -458,47 +431,36 @@ ccColor3B StreakData::getCategoryColor(BadgeCategory category) {
 }
 
 StreakData::BadgeInfo* StreakData::getBadgeInfo(const std::string& badgeID) {
-    if (badgeID.empty()) return nullptr; // Devolver null si el ID está vacío
+    if (badgeID.empty()) return nullptr;
     for (auto& badge : badges) {
         if (badge.badgeID == badgeID) return &badge;
     }
-    return nullptr; // No encontrado
+    return nullptr;
 }
 
 bool StreakData::isBadgeUnlocked(const std::string& badgeID) {
-    if (badgeID.empty()) return false; // Insignia vacía no puede estar desbloqueada
-    // Asegurar tamaño correcto antes de comprobar
+    if (badgeID.empty()) return false;
     if (unlockedBadges.size() != badges.size()) {
-        // log::warn("isBadgeUnlocked: unlockedBadges size mismatch. Assuming false.");
         return false;
     }
     for (size_t i = 0; i < badges.size(); ++i) {
-        // Comprobar índice antes de acceder
         if (i < unlockedBadges.size() && badges[i].badgeID == badgeID) {
-            return unlockedBadges[i]; // Devolver el valor booleano
+            return unlockedBadges[i];
         }
     }
-    return false; // ID de insignia no encontrado en la lista 'badges'
+    return false;
 }
 
 void StreakData::equipBadge(const std::string& badgeID) {
-    if (badgeID.empty()) {
-        log::warn("Attempted to equip an empty badge ID.");
-        return;
-    }
+    if (badgeID.empty()) return;
     if (isBadgeUnlocked(badgeID)) {
-        if (equippedBadge != badgeID) { // Solo guardar si cambia
+        if (equippedBadge != badgeID) {
             equippedBadge = badgeID;
-            log::info("Equipped badge: {}", badgeID);
             save();
         }
-    }
-    else {
-        log::warn("Attempted to equip a locked or unknown badge: {}", badgeID);
     }
 }
 
 StreakData::BadgeInfo* StreakData::getEquippedBadge() {
-    // getBadgeInfo ya maneja el caso de equippedBadge vacío
     return getBadgeInfo(equippedBadge);
 }

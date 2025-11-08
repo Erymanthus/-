@@ -1,3 +1,10 @@
+# 1.8.7 New badges and Fix bugs
+- I've added a more efficient registration system to avoid data duplication.
+- New challenges have been added
+- It was added to messaging for moderators' announcements
+- A future button was added to store upcoming events
+- animation returned
+
 # 1.8.5 New Style And Badges
 - More badges were added
 - New design in the main menu

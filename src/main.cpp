@@ -18,47 +18,59 @@
 #include <Geode/modify/OptionsLayer.hpp>
 
 
+/* =================================================================
+ * PlayLayer (Ganar puntos con VERIFICACIÓN ANTI-CHEAT)
+ * =================================================================*/
 class $modify(MyPlayLayer, PlayLayer) {
     void levelComplete() {
+        // 1. Capturar porcentaje ANTES de que el juego procese la victoria
+        // Esto sirve para saber si ya lo habías completado antes.
+        int percentBefore = this->m_level->m_normalPercent;
 
-        int oldPercent = this->m_level->m_normalPercent;
-
-        
+        // 2. Ejecutar la lógica original del juego
+        // Esto es lo que debería guardar el progreso y poner el nivel al 100%.
         PlayLayer::levelComplete();
 
-        
-        if (oldPercent >= 100) {
-            return; 
+        // 3. Capturar porcentaje DESPUÉS de la victoria
+        int percentAfter = this->m_level->m_normalPercent;
+
+        // --- VERIFICACIONES DE SEGURIDAD ---
+
+        // A) Si es modo práctica, ignorar siempre.
+        if (this->m_isPracticeMode) return;
+
+        // B) Anti-Farm: Si ya estaba al 100% antes de jugar, no dar puntos de nuevo.
+        if (percentBefore >= 100) return;
+
+        // C) Anti-Hack: Si después de "completar", el porcentaje NO llegó a 100,
+        // significa que algo raro pasó (hack de noclip, instant complete falso, etc.).
+        if (percentAfter < 100) {
+            log::warn("⚠️ Anti-Cheat: levelComplete se ejecutó pero el porcentaje final es solo {}%", percentAfter);
+            return;
         }
 
+        // --- SI LLEGAMOS AQUÍ, ES UNA VICTORIA VÁLIDA ---
 
         int stars = this->m_level->m_stars;
-        int pointsGained = 0;
-        if (stars > 0 && !this->m_isPracticeMode) {
-            if (stars >= 1 && stars <= 3) pointsGained = 1;
-            else if (stars >= 4 && stars <= 5) pointsGained = 3;
-            else if (stars >= 6 && stars <= 7) pointsGained = 4;
-            else if (stars >= 8 && stars <= 9) pointsGained = 5;
-            else if (stars == 10) pointsGained = 6;
+        // Solo niveles con estrellas (rated) dan puntos
+        if (stars > 0) {
+            int points = 0;
+            if (stars <= 3) points = 1;       // Auto/Easy/Normal
+            else if (stars <= 5) points = 3;  // Hard
+            else if (stars <= 7) points = 4;  // Harder
+            else if (stars <= 9) points = 5;  // Insane
+            else points = 6;                  // Demon
 
-            if (pointsGained > 0) {
-                int pointsBefore = g_streakData.streakPointsToday;
-                g_streakData.addPoints(pointsGained);
-                int pointsRequired = g_streakData.getRequiredPoints();
+            if (points > 0) {
+                int before = g_streakData.streakPointsToday;
+                int required = g_streakData.getRequiredPoints();
 
+                log::info("✅ Nivel completado legalmente ({} stars -> {} points)", stars, points);
+                g_streakData.addPoints(points);
+
+                // Mostrar barra de progreso
                 if (auto scene = CCDirector::sharedDirector()->getRunningScene()) {
-                    CCObject* obj = nullptr;
-                    CCARRAY_FOREACH(scene->getChildren(), obj) {
-                        if (auto popup = dynamic_cast<InfoPopup*>(obj)) {
-                            popup->updateDisplay();
-                            break;
-                        }
-                    }
-                }
-
-                auto progressBar = StreakProgressBar::create(pointsGained, pointsBefore, pointsRequired);
-                if (auto scene = CCDirector::sharedDirector()->getRunningScene()) {
-                    scene->addChild(progressBar, 100);
+                    scene->addChild(StreakProgressBar::create(points, before, required), 100);
                 }
             }
         }
