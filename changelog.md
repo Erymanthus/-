@@ -1,3 +1,6 @@
+# 1.8.9
+- The design of the upper part was improved
+
 # 1.8.7 New badges and Fix bugs
 - I've added a more efficient registration system to avoid data duplication.
 - New challenges have been added

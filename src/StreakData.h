@@ -96,7 +96,8 @@ struct StreakData {
 		{0, "Skybound_badge.png"_spr, "By La Fluffaroni", BadgeCategory::EPIC, "Skybound_badge", true },
 		{0, "Steampunk_Dash_badge.png"_spr, "By La Fluffaroni", BadgeCategory::COMMON, "Steampunk_Dash_badge", true },
 		{0, "money_badge.png"_spr, "By La Fluffaroni", BadgeCategory::SPECIAL, "money_badge", true },
-		{0, "Skeletal_Shenanigans_badge.png"_spr, "By Fluffaroni", BadgeCategory::LEGENDARY, "Skeletal_Shenanigans_badge",true}
+		{0, "Skeletal_Shenanigans_badge.png"_spr, "By Fluffaroni", BadgeCategory::LEGENDARY, "Skeletal_Shenanigans_badge",true},
+        {0, "moderator_badge.png"_spr, "Moderator", BadgeCategory::LEGENDARY, "moderator_badge",true}
 
 
 

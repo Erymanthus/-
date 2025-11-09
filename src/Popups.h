@@ -2438,64 +2438,100 @@ protected:
         if (!CCLayer::init()) return false;
         this->m_playerData = playerData;
 
-        float cellWidth = 330.f; // AUMENTADO A 330
+        float cellWidth = 300.f;
         float cellHeight = 40.f;
         this->setContentSize({ cellWidth, cellHeight });
 
-        if (isLocalPlayer && showHighlight) {
-            auto bg = CCLayerColor::create({ 0, 255, 0, 50 });
-            bg->setContentSize({ cellWidth, cellHeight });
-            this->addChild(bg);
+        // --- NOMBRE VERDE SI ES LOCAL ---
+        ccColor3B nameColor = { 255, 255, 255 };
+        if (isLocalPlayer) {
+            nameColor = { 0, 255, 100 };
         }
 
-        ccColor3B rankColor = { 255, 255, 255 };
-        if (rank == 1) rankColor = { 255, 215, 0 };
-        else if (rank == 2) rankColor = { 192, 192, 192 };
-        else if (rank == 3) rankColor = { 205, 127, 50 };
+        // --- RANGO (SPRITE O TEXTO) ---
+        if (rank >= 1 && rank <= 3) {
+            std::string spriteName = fmt::format("top{}.png"_spr, rank);
+            auto rankSprite = CCSprite::create(spriteName.c_str());
+            if (!rankSprite) {
+                goto use_text_rank;
+            }
+            rankSprite->setScale(0.35f);
+            rankSprite->setPosition({ 25.f, cellHeight / 2 });
+            this->addChild(rankSprite);
 
-        std::string rankTxt = (rank > 0) ? fmt::format("#{}", rank) : "#?";
-        auto rankLabel = CCLabelBMFont::create(rankTxt.c_str(), "goldFont.fnt");
-        rankLabel->setColor(rankColor);
-        rankLabel->setScale(rank > 999 ? 0.5f : 0.7f);
-        rankLabel->limitLabelWidth(45.f, rankLabel->getScale(), 0.1f);
-        rankLabel->setPosition({ 25.f, cellHeight / 2 });
-        this->addChild(rankLabel);
+            // --- EFECTO ESPECIAL PARA EL TOP 1 ---
+            if (rank == 1) {
+                // 1. Brillo giratorio detrás
+                auto glowSprite = CCSprite::createWithSpriteFrameName("shineBurst_001.png");
+                if (glowSprite) {
+                    glowSprite->setColor({ 255, 200, 0 }); // Dorado intenso
+                    // --- CORRECCIÓN: Escala aumentada de 1.2f a 3.0f para que se vea bien ---
+                    glowSprite->setScale(3.0f);
+                    glowSprite->setOpacity(150); // Semitransparente
+                    glowSprite->setPosition(rankSprite->getContentSize() / 2);
+                    glowSprite->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
+                    glowSprite->runAction(CCRepeatForever::create(CCRotateBy::create(4.0f, 360.f)));
+                    rankSprite->addChild(glowSprite, -1);
+                }
 
+                // 2. Suave pulsación del icono principal
+                auto pulseSequence = CCSequence::create(
+                    CCEaseSineInOut::create(CCScaleTo::create(0.8f, 0.38f)),
+                    CCEaseSineInOut::create(CCScaleTo::create(0.8f, 0.35f)),
+                    nullptr
+                );
+                rankSprite->runAction(CCRepeatForever::create(pulseSequence));
+            }
+            // ------------------------------------
+        }
+        else {
+        use_text_rank:
+            ccColor3B rankColor = { 255, 255, 255 };
+            std::string rankTxt = (rank > 0) ? fmt::format("#{}", rank) : "#?";
+            auto rankLabel = CCLabelBMFont::create(rankTxt.c_str(), "goldFont.fnt");
+            rankLabel->setColor(rankColor);
+            rankLabel->setScale(rank > 999 ? 0.5f : 0.7f);
+            rankLabel->limitLabelWidth(45.f, rankLabel->getScale(), 0.1f);
+            rankLabel->setPosition({ 25.f, cellHeight / 2 });
+            this->addChild(rankLabel);
+        }
+
+        // --- INSIGNIA ---
         std::string badgeID = playerData["equipped_badge_id"].as<std::string>().unwrapOr("");
         if (!badgeID.empty()) {
             if (auto badgeInfo = g_streakData.getBadgeInfo(badgeID)) {
                 auto badgeSprite = CCSprite::create(badgeInfo->spriteName.c_str());
                 if (badgeSprite) {
                     badgeSprite->setScale(0.15f);
-                    badgeSprite->setPosition({ 65.f, cellHeight / 2 });
+                    badgeSprite->setPosition({ 60.f, cellHeight / 2 });
                     this->addChild(badgeSprite);
                 }
             }
         }
 
+        // --- NOMBRE DE USUARIO ---
         std::string username = playerData["username"].as<std::string>().unwrapOr("-");
         auto usernameLabel = CCLabelBMFont::create(username.c_str(), "goldFont.fnt");
-        usernameLabel->limitLabelWidth(130.f, 0.6f, 0.1f);
-        if (isLocalPlayer) usernameLabel->setColor({ 100, 255, 100 });
+        usernameLabel->limitLabelWidth(120.f, 0.6f, 0.1f);
+        usernameLabel->setColor(nameColor);
 
         auto usernameBtn = CCMenuItemSpriteExtra::create(
             usernameLabel, this, menu_selector(LeaderboardCell::onViewProfile)
         );
         usernameBtn->setAnchorPoint({ 0.f, 0.5f });
-        usernameBtn->setPosition({ 90.f, cellHeight / 2 });
+        usernameBtn->setPosition({ 85.f, cellHeight / 2 });
 
         auto menu = CCMenu::createWithItem(usernameBtn);
         menu->setPosition({ 0, 0 });
         this->addChild(menu);
 
-        // --- AJUSTES DE DERECHA ---
+        // --- DÍAS DE RACHA ---
         int streakDays = playerData["current_streak_days"].as<int>().unwrapOr(0);
         std::string spriteName = g_streakData.getRachaSprite(streakDays);
         auto streakIcon = CCSprite::create(spriteName.c_str());
         if (!streakIcon) streakIcon = CCSprite::create("racha0.png"_spr);
         streakIcon->setScale(0.15f);
-        // Movido más a la derecha (antes -90)
-        streakIcon->setPosition({ cellWidth - 70.f, cellHeight / 2 });
+        streakIcon->setPosition({ cellWidth - 80.f, cellHeight / 2 });
         this->addChild(streakIcon);
 
         auto streakLabel = CCLabelBMFont::create(std::to_string(streakDays).c_str(), "bigFont.fnt");
@@ -2504,31 +2540,31 @@ protected:
         streakLabel->setPosition({ streakIcon->getPositionX() + 12.f, cellHeight / 2 });
         this->addChild(streakLabel);
 
+        // --- PUNTOS ---
         int streakPoints = playerData["total_streak_points"].as<int>().unwrapOr(0);
         auto pointIcon = CCSprite::create("streak_point.png"_spr);
         pointIcon->setScale(0.12f);
-        // Movido más a la derecha (antes -35)
-        pointIcon->setPosition({ cellWidth - 25.f, cellHeight / 2 + 8.f });
+        pointIcon->setPosition({ cellWidth - 30.f, cellHeight / 2 + 8.f });
         this->addChild(pointIcon);
 
         auto pointsLabel = CCLabelBMFont::create(std::to_string(streakPoints).c_str(), "goldFont.fnt");
         pointsLabel->setScale(0.3f);
         pointsLabel->setAnchorPoint({ 0.5f, 0.5f });
-        // Movido más a la derecha (antes -35)
-        pointsLabel->setPosition({ cellWidth - 25.f, cellHeight / 2 - 8.f });
+        pointsLabel->setPosition({ cellWidth - 30.f, cellHeight / 2 - 8.f });
         this->addChild(pointsLabel);
 
         return true;
     }
-    // ... resto igual (onViewProfile, create)
+
     void onViewProfile(CCObject*) {
         int accountID = m_playerData["accountID"].as<int>().unwrapOr(0);
         if (accountID != 0) {
             ProfilePage::create(accountID, false)->show();
         }
     }
+
 public:
-    static LeaderboardCell* create(matjson::Value playerData, int rank, bool isLocalPlayer = false, bool showHighlight = true) {
+    static LeaderboardCell* create(matjson::Value playerData, int rank, bool isLocalPlayer, bool showHighlight = true) {
         auto ret = new LeaderboardCell();
         if (ret && ret->init(playerData, rank, isLocalPlayer, showHighlight)) {
             ret->autorelease();
@@ -2670,18 +2706,17 @@ protected:
     }
 
     bool setup() override {
-        // Reducimos un poco la altura total ya que quitamos la barra grande de abajo
         m_mainLayer->setContentSize({ 340.f, 280.f });
         this->setTitle("Top Streaks");
         auto winSize = this->m_mainLayer->getContentSize();
 
-        // 1. Lista Principal (Top) - MÁS ALTA DE NUEVO
+        // 1. Lista Principal
         auto listBg = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
         listBg->setColor({ 0, 0, 0 }); listBg->setOpacity(120);
-        CCSize listSize = { 330.f, 210.f }; // Volvemos a una altura mayor
+        CCSize listSize = { 300.f, 210.f };
         listBg->setContentSize(listSize);
-        // Centrada un poco más arriba del centro geométrico para dejar espacio abajo al texto
-        listBg->setPosition({ winSize.width / 2, winSize.height / 2 + 10.f });
+        // --- CORRECCIÓN: Bajamos la lista un poco más (-5.f desde el centro) ---
+        listBg->setPosition({ winSize.width / 2, winSize.height / 2 - 5.f });
         this->m_mainLayer->addChild(listBg);
 
         this->m_fields.m_listContainer = CCNode::create();
@@ -2689,23 +2724,24 @@ protected:
         this->m_fields.m_listContainer->setPosition(listBg->getPosition() - listBg->getContentSize() / 2);
         this->m_mainLayer->addChild(this->m_fields.m_listContainer);
 
-        // 2. Etiqueta de "Mi Rango" (Pequeña estadística abajo a la izquierda)
+        // 2. Etiqueta de "Mi Rango"
         this->m_fields.m_myRankLabel = CCLabelBMFont::create("My Rank: ...", "goldFont.fnt");
         this->m_fields.m_myRankLabel->setScale(0.5f);
-        this->m_fields.m_myRankLabel->setAnchorPoint({ 0.f, 0.5f }); // Alinear a la izquierda
-        this->m_fields.m_myRankLabel->setPosition({ 20.f, 25.f });   // Esquina inferior izquierda
-        this->m_fields.m_myRankLabel->setColor({ 200, 200, 200 });   // Color gris inicial mientras carga
+        this->m_fields.m_myRankLabel->setAnchorPoint({ 0.f, 0.5f });
+        // --- CORRECCIÓN: Bajamos un poco el texto para que no choque con la lista ---
+        this->m_fields.m_myRankLabel->setPosition({ 22.f, 18.f });
+        this->m_fields.m_myRankLabel->setColor({ 200, 200, 200 });
         this->m_mainLayer->addChild(this->m_fields.m_myRankLabel);
 
-        // Flechas - Posicionadas respecto al centro de la lista
+        // Flechas - Ajustadas a la nueva altura de la lista (-5.f)
         auto sprLeft = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png");
         this->m_fields.m_leftArrow = CCMenuItemSpriteExtra::create(sprLeft, this, menu_selector(LeaderboardPopup::onPrevPage));
-        this->m_fields.m_leftArrow->setPosition({ -185.f, 10.f }); // Ajustado Y relativo al centro del popup
+        this->m_fields.m_leftArrow->setPosition({ -175.f, -5.f }); // Ajustado Y
         this->m_fields.m_leftArrow->setVisible(false);
 
         auto sprRight = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png"); sprRight->setFlipX(true);
         this->m_fields.m_rightArrow = CCMenuItemSpriteExtra::create(sprRight, this, menu_selector(LeaderboardPopup::onNextPage));
-        this->m_fields.m_rightArrow->setPosition({ 185.f, 10.f });
+        this->m_fields.m_rightArrow->setPosition({ 175.f, -5.f }); // Ajustado Y
         this->m_fields.m_rightArrow->setVisible(false);
 
         auto arrowMenu = CCMenu::create();
@@ -2714,7 +2750,7 @@ protected:
         arrowMenu->setPosition(winSize / 2);
         this->m_mainLayer->addChild(arrowMenu);
 
-        // Loading
+        // ... (resto igual)
         this->m_fields.m_loadingCircle = LoadingCircle::create();
         this->m_fields.m_loadingCircle->setPosition(winSize / 2);
         this->m_fields.m_loadingCircle->show();
