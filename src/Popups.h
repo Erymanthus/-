@@ -527,17 +527,10 @@ protected:
     void onClaimMission(CCObject* sender) {
         int levelID = sender->getTag();
         log::info("Attempting to claim reward for level ID: {}", levelID);
-        std::string rewardMessage = "";
-        bool isNewBadge = false;
-        GJGameLevel* level = GameLevelManager::sharedState()->getSavedLevel(levelID);
-      
 
         const LevelMission* missionPtr = nullptr;
-        for (const auto& m : g_levelMissions) {
-            if (m.levelID == levelID) {
-                missionPtr = &m;
-                break;
-            }
+        for (const auto& m : g_levelMissions) { if (m.levelID == levelID)
+        { missionPtr = &m; break; } 
         }
 
         if (!missionPtr) {
@@ -546,49 +539,50 @@ protected:
             return;
         }
 
-        
         const LevelMission& mission = *missionPtr;
-     
 
         if (g_streakData.isLevelMissionClaimed(levelID)) {
             log::warn("Attempted to claim already claimed mission ID {}", levelID);
             FLAlertLayer::create("Error", "Mission already claimed.", "OK")->show();
-            updatePage();
+            updatePage(); 
             return;
         }
 
-      
+        GJGameLevel* level = GameLevelManager::sharedState()->getSavedLevel(levelID);
         if (!level || level->m_normalPercent < 100) {
             log::error("Attempted to claim mission for level ID {} which is not completed!", levelID);
             FLAlertLayer::create("Error", "Level not completed yet.", "OK")->show();
             updatePage();
-            return;
+            return; 
         }
 
-    
+        g_streakData.completedLevelMissions.insert(levelID);
+
+
+        std::string rewardMessage = "";
+        bool isNewBadge = false;
         if (!mission.rewardBadgeID.empty()) {
             isNewBadge = !g_streakData.isBadgeUnlocked(mission.rewardBadgeID);
             g_streakData.unlockBadge(mission.rewardBadgeID);
             auto bInfo = g_streakData.getBadgeInfo(mission.rewardBadgeID);
             rewardMessage = fmt::format("Badge: {}", bInfo ? bInfo->displayName : "Unknown");
         }
+
         if (mission.secondaryRewardType == LevelRewardType::SuperStars) {
             g_streakData.superStars += mission.secondaryRewardQuantity;
-            if (!rewardMessage.empty()) rewardMessage += " and ";
+            if (!rewardMessage.empty()) rewardMessage += " and "; 
             rewardMessage += fmt::format("{} Super Stars", mission.secondaryRewardQuantity);
         }
+
         else if (mission.secondaryRewardType == LevelRewardType::StarTickets) {
             g_streakData.starTickets += mission.secondaryRewardQuantity;
             if (!rewardMessage.empty()) rewardMessage += " and ";
-            rewardMessage += fmt::format("{} Tickets", mission.secondaryRewardQuantity);
-        }
+            rewardMessage += fmt::format("{} Tickets", mission.secondaryRewardQuantity); }
 
         g_streakData.save();
         updatePage();
-
-        
         FLAlertLayer::create("Reward Claimed!", fmt::format("You received: {}", rewardMessage), "OK")->show();
-        FMODAudioEngine::sharedEngine()->playEffect("achievement.mp3"_spr);
+        FMODAudioEngine::sharedEngine()->playEffect("achievement.mp3"_spr); 
     }
 
 
