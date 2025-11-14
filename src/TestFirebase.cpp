@@ -75,6 +75,7 @@ void updatePlayerDataInFirebase() {
     matjson::Value playerData = matjson::Value::object();
 
    
+
     playerData.set("username", std::string(accountManager->m_username));
     playerData.set("accountID", accountID);
     playerData.set("current_streak_days", g_streakData.currentStreak);
