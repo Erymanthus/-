@@ -1,19 +1,16 @@
 #include "StreakData.h"
-#include "FirebaseManager.h" // Necesario para updatePlayerDataInFirebase
-#include <Geode/utils/cocos.hpp> // Para log::
+#include "FirebaseManager.h"
+#include <Geode/utils/cocos.hpp> 
 #include <sstream>
 #include <iomanip>
 #include <ctime>
 #include <cmath>
-#include <stdexcept> // Para std::stoi excepciones
-#include <Geode/binding/GJAccountManager.hpp> // Necesario para el truco de admin temporal
-#include <algorithm> // Necesario para std::transform (convertir a minúsculas)
-#include <cctype>    // Necesario para std::tolower
+#include <Geode/binding/GJAccountManager.hpp> 
+#include <algorithm>
+#include <cctype>   
 
-// Definición de la variable global (importante)
 StreakData g_streakData;
 
-// --- Implementación de Funciones ---
 
 void StreakData::resetToDefault() {
     currentStreak = 0;
@@ -30,7 +27,7 @@ void StreakData::resetToDefault() {
     starTickets = 0;
     lastRouletteIndex = 0;
     totalSpins = 0;
-    streakCompletedLevels.clear(); // ¿Aún necesario?
+    streakCompletedLevels.clear(); 
     streakPointsHistory.clear();
     pointMission1Claimed = false;
     pointMission2Claimed = false;
@@ -38,33 +35,31 @@ void StreakData::resetToDefault() {
     pointMission4Claimed = false;
     pointMission5Claimed = false;
     pointMission6Claimed = false;
-    // Asegurar tamaño correcto y resetear a false
+   
     if (unlockedBadges.size() != badges.size()) {
         unlockedBadges.assign(badges.size(), false);
     }
     else {
         std::fill(unlockedBadges.begin(), unlockedBadges.end(), false);
     }
-    completedLevelMissions.clear(); // <-- Resetear misiones de nivel
+    completedLevelMissions.clear(); 
 
-    // --- NUEVO: Resetear roles y contadores ---
-    userRole = 0;       // Reset a usuario normal por defecto
-    dailyMsgCount = 0;  // Resetear contador de mensajes
-    // ------------------------------------------
+  
+    userRole = 0;       
+    dailyMsgCount = 0; 
+   
 
     isDataLoaded = false;
     m_initialized = false;
 }
 
 void StreakData::load() {
-    // Vacía a propósito - la carga real es en MenuLayer/AccountWatcher
+  
 }
 
 void StreakData::save() {
-    // NUEVO: Protección de seguridad.
-    // Si no hemos cargado los datos, ¡NO SOBRESCRIBIR EL SERVIDOR!
+   
     if (!isDataLoaded && !m_initialized) {
-        // log::warn("Intento de guardado bloqueado: Datos no cargados aún.");
         return;
     }
     updatePlayerDataInFirebase();
@@ -88,7 +83,9 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
             std::string roleStr = data["role"].as<std::string>().unwrapOr("");
             
             std::transform(roleStr.begin(), roleStr.end(), roleStr.begin(),
-                [](unsigned char c) { return std::tolower(c); });
+                [](unsigned char c) { return std::tolower(c);
+                }
+            );
 
             if (roleStr == "admin" || roleStr == "administrator") userRole = 2;
             else if (roleStr == "moderator" || roleStr == "mod") userRole = 1;
@@ -125,8 +122,13 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
     }
 
    
-    pointMission1Claimed = false; pointMission2Claimed = false; pointMission3Claimed = false;
-    pointMission4Claimed = false; pointMission5Claimed = false; pointMission6Claimed = false;
+    pointMission1Claimed = false;
+    pointMission2Claimed = false;
+    pointMission3Claimed = false;
+    pointMission4Claimed = false;
+    pointMission5Claimed = false;
+    pointMission6Claimed = false;
+
     if (data.contains("missions")) {
         auto missionsResult = data["missions"].as<std::map<std::string, matjson::Value>>();
         if (missionsResult.isOk()) {
@@ -153,7 +155,7 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
             }
         }
         else {
-            log::warn("No se pudo leer 'history' como un objeto desde el servidor.");
+            log::warn("'history' could not be read as an object from the server");
         }
     }
 
@@ -163,18 +165,18 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
         auto missionsResult = data["completedLevelMissions"].as<std::map<std::string, matjson::Value>>();
         if (missionsResult.isOk()) {
             for (const auto& [levelIDStr, _] : missionsResult.unwrap()) {
-                try {
-                    completedLevelMissions.insert(std::stoi(levelIDStr));
+                if (auto levelID = numFromString<int>(levelIDStr)) {
+                    completedLevelMissions.insert(levelID.unwrap());
                 }
-                catch (const std::exception& e) {
-                    log::warn("Error al convertir ID '{}': {}", levelIDStr, e.what());
+                else {
+                    log::warn("Error al convertir ID '{}': {}", levelIDStr, levelID.unwrapErr());
                 }
             }
             log::info("Loaded {} completed level missions.", completedLevelMissions.size());
         }
     }
 
-    // Llamar a checkRewards DESPUÉS de cargar todo
+  
     this->checkRewards();
 
     isDataLoaded = true;
@@ -274,8 +276,13 @@ void StreakData::dailyUpdate() {
         lastDay = today;
         streakPointsToday = 0;
         dailyMsgCount = 0;
-        pointMission1Claimed = false; pointMission2Claimed = false; pointMission3Claimed = false;
-        pointMission4Claimed = false; pointMission5Claimed = false; pointMission6Claimed = false;
+        pointMission1Claimed = false;
+        pointMission2Claimed = false;
+        pointMission3Claimed = false;
+        pointMission4Claimed = false;
+        pointMission5Claimed = false;
+        pointMission6Claimed = false;
+
         save();
         return;
     }
@@ -287,8 +294,13 @@ void StreakData::dailyUpdate() {
         lastDay = today;
         streakPointsToday = 0;
         dailyMsgCount = 0;
-        pointMission1Claimed = false; pointMission2Claimed = false; pointMission3Claimed = false;
-        pointMission4Claimed = false; pointMission5Claimed = false; pointMission6Claimed = false;
+        pointMission1Claimed = false;
+        pointMission2Claimed = false;
+        pointMission3Claimed = false;
+        pointMission4Claimed = false;
+        pointMission5Claimed = false; 
+        pointMission6Claimed = false;
+
         save();
         return;
     }
@@ -317,12 +329,16 @@ void StreakData::dailyUpdate() {
         needsSave = true;
     }
 
-    // Reseteo diario (incluyendo contador de mensajes)
+   
     streakPointsToday = 0;
     dailyMsgCount = 0;
     lastDay = today;
-    pointMission1Claimed = false; pointMission2Claimed = false; pointMission3Claimed = false;
-    pointMission4Claimed = false; pointMission5Claimed = false; pointMission6Claimed = false;
+    pointMission1Claimed = false;
+    pointMission2Claimed = false;
+    pointMission3Claimed = false;
+    pointMission4Claimed = false; 
+    pointMission5Claimed = false; 
+    pointMission6Claimed = false;
     needsSave = true;
 
     if (needsSave) {
@@ -356,7 +372,6 @@ void StreakData::checkRewards() {
     }
 }
 
-// En StreakData.cpp
 
 void StreakData::addPoints(int count) {
     if (count <= 0) return;
@@ -365,8 +380,7 @@ void StreakData::addPoints(int count) {
 
     int currentRequired = getRequiredPoints();
 
-    // --- CORRECCIÓN CRÍTICA AQUÍ ---
-    // Verificamos si YA tenías la meta cumplida ANTES de sumar los nuevos puntos.
+   
     bool alreadyReachedGoalToday = (streakPointsToday >= currentRequired);
 
     streakPointsToday += count;
@@ -377,21 +391,20 @@ void StreakData::addPoints(int count) {
         streakPointsHistory[today] = streakPointsToday;
     }
 
-    // Solo activamos la nueva racha si NO la tenías antes Y AHORA SÍ la tienes.
+    
     if (!alreadyReachedGoalToday && streakPointsToday >= currentRequired) {
         currentStreak++;
         hasNewStreak = true;
         checkRewards();
     }
-    // -------------------------------
+   
 
     save();
 }
 
 bool StreakData::shouldShowAnimation() {
-    // Si tenemos racha Y es mayor que la última que celebramos...
     if (currentStreak > 0 && currentStreak > lastStreakAnimated) {
-        return true; // ...mostramos la animación.
+        return true;
     }
     return false;
 }

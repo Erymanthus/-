@@ -25,8 +25,8 @@ struct StreakData {
     int totalSpins;
     bool needsRegistration = false;
     int lastStreakAnimated = 0;
-    bool isBanned = false;             // Para saber si está baneado
-    std::string banReason = "";        // Para guardar la razón
+    bool isBanned = false;            
+    std::string banReason = "";       
     int starTickets;
     std::vector<int> streakCompletedLevels;
     std::map<std::string, int> streakPointsHistory;
@@ -38,14 +38,18 @@ struct StreakData {
     bool pointMission6Claimed;
     bool isDataLoaded;
     bool m_initialized = false;
-    int userRole = 0;          // 0=Usuario, 1=Moderador, 2=Admin
-    int dailyMsgCount = 0;     // Contador de mensajes enviados hoy (para mods)
+    int userRole = 0;          
+    int dailyMsgCount = 0;    
 
     
     std::set<int> completedLevelMissions;
 
     enum class BadgeCategory {
-        COMMON, SPECIAL, EPIC, LEGENDARY, MYTHIC
+        COMMON,
+        SPECIAL,
+        EPIC,
+        LEGENDARY,
+        MYTHIC
     };
 
     struct BadgeInfo {

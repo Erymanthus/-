@@ -14,55 +14,45 @@ using namespace geode::prelude;
 static EventListener<web::WebTask> s_updateListener;
 static EventListener<web::WebTask> s_loadListener;
 
-// En TestFirebase.cpp
 
 void loadPlayerDataFromServer() {
     auto am = GJAccountManager::sharedState();
     if (!am || am->m_accountID == 0) {
         g_streakData.resetToDefault();
         g_streakData.isDataLoaded = true;
-        g_streakData.m_initialized = true; // Asegurar que esto también sea true
+        g_streakData.m_initialized = true;
         return;
     }
     int accountID = am->m_accountID;
     std::string url = fmt::format("https://streak-servidor.onrender.com/players/{}", accountID);
-    log::info("☁️ Solicitando datos al servidor...");
+    log::info("☁️ Requesting data from the server...");
 
     s_loadListener.bind([accountID](web::WebTask::Event* e) {
         if (web::WebResponse* res = e->getValue()) {
             if (res->ok() && res->json().isOk()) {
-                try {
-                    g_streakData.parseServerResponse(res->json().unwrap());
-                    g_streakData.isDataLoaded = true;
-                    g_streakData.m_initialized = true; // ¡IMPORTANTE!
-                    log::info("☁️✅ Datos recibidos y procesados.");
-                }
-                catch (const std::exception& err) {
-                    log::error("☁️❌ Error al leer JSON: {}", err.what());
-                    g_streakData.resetToDefault();
-                    g_streakData.isDataLoaded = true;
-                    g_streakData.m_initialized = true;
-                }
+                g_streakData.parseServerResponse(res->json().unwrap());
+                g_streakData.isDataLoaded = true;
+                g_streakData.m_initialized = true;
+                log::info("☁️✅ Data received and processed.");
             }
-            // --- NUEVO: MANEJO ESPECÍFICO PARA 404 ---
+          
             else if (res->code() == 404) {
-                log::info("☁️ℹ️ Usuario nuevo (404). Requiere registro.");
+                log::info("☁️ℹ️ New user (404). Registration required.");
                 g_streakData.resetToDefault();
                 g_streakData.needsRegistration = true;
                 g_streakData.isDataLoaded = true;
                 g_streakData.m_initialized = true;
             }
-            // --- CORRECCIÓN AQUÍ ---
+           
             else {
-                log::warn("☁️⚠️ Carga fallida (Code: {}). Mantenemos estado de error.", res->code());
-                // NO marcamos como loaded ni initialized si falla la red.
+                log::warn("☁️⚠️Load failed (Code: {}). We maintain error state.", res->code());
                 g_streakData.isDataLoaded = false;
                 g_streakData.m_initialized = false;
             }
-            // -----------------------
+          
         }
         else if (e->isCancelled()) {
-            log::warn("☁️⚠️ Carga cancelada.");
+            log::warn("☁️⚠️ Loading canceled.");
             g_streakData.isDataLoaded = false;
             g_streakData.m_initialized = false;
         }
@@ -71,21 +61,20 @@ void loadPlayerDataFromServer() {
     s_loadListener.setFilter(req.get(url));
 }
 
-// --- GUARDADO DE DATOS (CON TUS CAMPOS EXACTOS) ---
 void updatePlayerDataInFirebase() {
     auto accountManager = GJAccountManager::sharedState();
     if (!accountManager || accountManager->m_accountID == 0) {
-        log::error("🔥❌ Guardado cancelado: No logueado.");
+        log::error("🔥❌ Save canceled: Not logged in.");
         return;
     }
 
-    log::warn("🔥 INICIANDO GUARDADO...");
+    log::warn("🔥STARTING SAVING...");
 
     int accountID = accountManager->m_accountID;
     int userID = GameManager::sharedState()->m_playerUserID;
     matjson::Value playerData = matjson::Value::object();
 
-    // >>> TUS CAMPOS EXACTOS (COPIADOS Y PEGADOS) <<<
+   
     playerData.set("username", std::string(accountManager->m_username));
     playerData.set("accountID", accountID);
     playerData.set("current_streak_days", g_streakData.currentStreak);
@@ -99,9 +88,7 @@ void updatePlayerDataInFirebase() {
     playerData.set("last_day", g_streakData.lastDay);
     playerData.set("streakPointsToday", g_streakData.streakPointsToday);
     playerData.set("userID", userID);
-    // >>> FIN DE TUS CAMPOS EXACTOS <<<
-
-    // Resto de datos (Arrays y objetos)
+    
     std::vector<std::string> unlocked_badges_vec;
     if (g_streakData.unlockedBadges.size() == g_streakData.badges.size()) {
         for (size_t i = 0; i < g_streakData.badges.size(); ++i) {
@@ -141,19 +128,19 @@ void updatePlayerDataInFirebase() {
     }
     playerData.set("completedLevelMissions", completed_levels_obj);
 
-    // Enviar
+   
     std::string jsonDump = playerData.dump(matjson::NO_INDENTATION);
-    log::info("🔥📄 JSON a enviar: {}", jsonDump);
+    log::info("🔥📄 JSON to send: {}", jsonDump);
 
     std::string url = fmt::format("https://streak-servidor.onrender.com/players/{}", accountID);
 
     s_updateListener.bind([](web::WebTask::Event* e) {
         if (web::WebResponse* res = e->getValue()) {
             if (!res->ok()) {
-                log::error("🔥❌ ERROR SERVIDOR: {}", res->code());
+                log::error("🔥❌ SERVER ERROR: {}", res->code());
             }
             else {
-                log::info("🔥✅ GUARDADO EXITOSO.");
+                log::info("🔥✅ SAVED SUCCESSFULLY.");
             }
         }
         });

@@ -8,30 +8,23 @@
 #include <Geode/cocos/particle_nodes/CCParticleSystemQuad.h>
 #include <Geode/cocos/extensions/cocos-ext.h>
 #include <Geode/ui/TextInput.hpp>
-
-
-#include <Geode/binding/GameLevelManager.hpp> // Necesario para verificar niveles completados
-#include <Geode/binding/GJGameLevel.hpp>     // Necesario para GJGameLevel
+#include <Geode/binding/GameLevelManager.hpp> 
+#include <Geode/binding/GJGameLevel.hpp>   
 #include <Geode/binding/CreatorLayer.hpp>
 #include <Geode/binding/GameManager.hpp>
-#include <Geode/utils/cocos.hpp> // For log::error if sprite fails
-#include <Geode/binding/DailyLevelPage.hpp> // <-- Necesario para DailyLevelPage
+#include <Geode/utils/cocos.hpp>
+#include <Geode/binding/DailyLevelPage.hpp> 
 #include <cocos2d.h>
 #include <cocos-ext.h>
-#include <fmt/format.h> // For fmt::format
+#include <fmt/format.h> 
 #include <Geode/utils/web.hpp>
 #include <Geode/binding/TextArea.hpp>
-#include <Geode/binding/ProfilePage.hpp> // Necesario para ver el perfil
-#include <Geode/Result.hpp> // Para value_or
-#include <variant> // Necesario para std::holds_alternative
+#include <Geode/binding/ProfilePage.hpp>
+#include <Geode/Result.hpp> 
+#include <variant>
 #include <Geode/ui/Notification.hpp>
-
-
-
-#include <Geode/binding/CCMenuItemSpriteExtra.hpp> // Necesario para los botones
-
-#include <map>    // Necesario para std::map
-
+#include <Geode/binding/CCMenuItemSpriteExtra.hpp> 
+#include <map> 
 #include <exception>
 #include <vector>
 #include <string>
@@ -39,8 +32,6 @@
 #include <algorithm>
 
 class ShopPopup;
-
-
 
 enum class RewardType { Badge, SuperStar, StarTicket };
 
@@ -139,9 +130,12 @@ protected:
         listBg->setPosition(popupCenter);
         m_mainLayer->addChild(listBg);
         m_historyEntries = std::vector<std::pair<std::string, int>>(g_streakData.streakPointsHistory.begin(), g_streakData.streakPointsHistory.end());
+
         std::sort(m_historyEntries.begin(), m_historyEntries.end(), [](const auto& a, const auto& b) {
             return a.first < b.first;
-            });
+            }
+        );
+
         m_totalPages = static_cast<int>(ceil(static_cast<float>(m_historyEntries.size()) / m_itemsPerPage));
         m_currentPage = (m_totalPages > 0) ? (m_totalPages - 1) : 0;
         m_pageContainer = CCLayer::create();
@@ -184,8 +178,12 @@ protected:
         m_rightArrow->setVisible(m_currentPage < m_totalPages - 1);
     }
 
-    void onPrevPage(CCObject*) { if (m_currentPage > 0) { m_currentPage--; this->updatePage(); } }
-    void onNextPage(CCObject*) { if (m_currentPage < m_totalPages - 1) { m_currentPage++; this->updatePage(); } }
+    void onPrevPage(CCObject*) { if (m_currentPage > 0) { m_currentPage--;
+    this->updatePage(); } }
+    void onNextPage(CCObject*) { if (m_currentPage < m_totalPages - 1) { m_currentPage++; 
+    this->updatePage(); } }
+
+
 public:
     static HistoryPopup* create() {
         auto ret = new HistoryPopup();
@@ -323,7 +321,6 @@ public:
 
 
 
-// --- Definiciones de Misiones de Nivel (PONER ANTES de LevelProgressPopup) ---
 enum class LevelRewardType {
     None, Badge, SuperStars, StarTickets
 };
@@ -331,11 +328,11 @@ enum class LevelRewardType {
 struct LevelMission {
     int levelID;
     std::string levelName;
-    std::string rewardBadgeID;              // Insignia principal
-    LevelRewardType secondaryRewardType;    // Tipo extra
-    int secondaryRewardQuantity;          // Cantidad extra
-    std::string secondaryRewardSprite;      // Sprite extra
-    std::string secondaryRewardDisplayName; // Nombre extra
+    std::string rewardBadgeID;              
+    LevelRewardType secondaryRewardType;   
+    int secondaryRewardQuantity;         
+    std::string secondaryRewardSprite;     
+    std::string secondaryRewardDisplayName;
 };
 
 
@@ -357,6 +354,7 @@ std::vector<LevelMission> g_levelMissions = {
      { 112690334 ,  "Frostbite",       "Frostbite_badge", LevelRewardType::SuperStars,          75,      "star_tiket.png"_spr,        "+75 Star Tickets" },
    
 };
+
 class LevelProgressPopup; 
 
 
@@ -396,24 +394,80 @@ protected:
 
         // ID Nivel (sin cambios)
         auto idLabel = CCLabelBMFont::create(fmt::format("ID: {}", mission.levelID).c_str(), "chatFont.fnt");
-        idLabel->setScale(0.5f); idLabel->setAnchorPoint({ 0, 0.5f }); idLabel->setPosition({ 15.f, 12.f }); idLabel->setColor({ 180, 180, 180 }); container->addChild(idLabel);
+        idLabel->setScale(0.5f);
+        idLabel->setAnchorPoint({ 0, 0.5f });
+        idLabel->setPosition({ 15.f, 12.f });
+        idLabel->setColor({ 180, 180, 180 });
+        container->addChild(idLabel);
 
         // Mostrar Recompensas (sin cambios)
-        float rewardAreaX = 185.f; float rewardSpacing = 35.f; CCSprite* primaryRewardSprite = nullptr;
-        if (badgeInfo) { primaryRewardSprite = CCSprite::create(badgeInfo->spriteName.c_str()); if (primaryRewardSprite) { primaryRewardSprite->setScale(0.18f); primaryRewardSprite->setPosition({ rewardAreaX, 22.5f }); container->addChild(primaryRewardSprite); } }
-        if (mission.secondaryRewardType != LevelRewardType::None) { if (primaryRewardSprite) primaryRewardSprite->setPositionX(rewardAreaX - rewardSpacing / 2); CCSprite* secondaryRewardSprite = CCSprite::create(mission.secondaryRewardSprite.c_str()); if (secondaryRewardSprite) { secondaryRewardSprite->setScale(0.18f); secondaryRewardSprite->setPosition({ rewardAreaX + rewardSpacing / 2, 22.5f }); container->addChild(secondaryRewardSprite); auto amountLabel = CCLabelBMFont::create(fmt::format("x{}", mission.secondaryRewardQuantity).c_str(), "goldFont.fnt"); amountLabel->setScale(0.35f); amountLabel->setAnchorPoint({ 0, 0.5f }); amountLabel->setPosition({ secondaryRewardSprite->getPositionX() + secondaryRewardSprite->getScaledContentSize().width * 0.5f + 3.f, 22.5f }); container->addChild(amountLabel); } }
-        auto rewardLabel = CCLabelBMFont::create("Reward(s)", "chatFont.fnt"); rewardLabel->setScale(0.4f); rewardLabel->setPosition({ rewardAreaX, 38.f }); container->addChild(rewardLabel);
+        float rewardAreaX = 185.f;
+        float rewardSpacing = 35.f;
+        CCSprite* primaryRewardSprite = nullptr;
+        if (badgeInfo) {
+            primaryRewardSprite = CCSprite::create(badgeInfo->spriteName.c_str());
+            if (primaryRewardSprite) {
+                primaryRewardSprite->setScale(0.18f);
+                primaryRewardSprite->setPosition({ rewardAreaX, 22.5f });
+                container->addChild(primaryRewardSprite);
+            }
+        }
+
+        if (mission.secondaryRewardType != LevelRewardType::None) {
+            if (primaryRewardSprite) {
+                primaryRewardSprite->setPositionX(rewardAreaX - rewardSpacing / 2);
+            }
+            CCSprite* secondaryRewardSprite = CCSprite::create(mission.secondaryRewardSprite.c_str());
+            if (secondaryRewardSprite) {
+                secondaryRewardSprite->setScale(0.18f);
+                secondaryRewardSprite->setPosition({ rewardAreaX + rewardSpacing / 2, 22.5f });
+                container->addChild(secondaryRewardSprite);
+
+                auto amountLabel = CCLabelBMFont::create(fmt::format("x{}", mission.secondaryRewardQuantity).c_str(), "goldFont.fnt");
+                amountLabel->setScale(0.35f);
+                amountLabel->setAnchorPoint({ 0, 0.5f });
+                amountLabel->setPosition({
+                    secondaryRewardSprite->getPositionX() + secondaryRewardSprite->getScaledContentSize().width * 0.5f + 3.f,
+                    22.5f
+                    });
+                container->addChild(amountLabel);
+            }
+        }
+
+        auto rewardLabel = CCLabelBMFont::create("Reward(s)", "chatFont.fnt");
+        rewardLabel->setScale(0.4f);
+        rewardLabel->setPosition({ rewardAreaX, 38.f });
+        container->addChild(rewardLabel);
 
        
         if (isMissionClaimed) {
-            auto checkmark = CCSprite::createWithSpriteFrameName("GJ_completesIcon_001.png"); checkmark->setScale(0.6f); checkmark->setPosition({ 255.f, 22.5f }); container->addChild(checkmark);
-            container->setOpacity(150); CCObject* child = nullptr; CCARRAY_FOREACH(container->getChildren(), child) { if (!child) continue; if (auto rgba = dynamic_cast<CCRGBAProtocol*>(child)) { if (dynamic_cast<CCSprite*>(child) != checkmark) { rgba->setOpacity(150); } } }
-        }
+            auto checkmark = CCSprite::createWithSpriteFrameName("GJ_completesIcon_001.png");
+            checkmark->setScale(0.6f);
+            checkmark->setPosition({ 255.f, 22.5f });
+            container->addChild(checkmark);
+            container->setOpacity(150);
+            CCObject* child = nullptr;
+            CCARRAY_FOREACH(container->getChildren(), child) { if (!child) continue;
+            if (auto rgba = typeinfo_cast<CCRGBAProtocol*>(child)) { if (typeinfo_cast<CCSprite*>(child) != checkmark) { rgba->setOpacity(150);
+
+             }
+            }
+           }
+          }
+
+
         else if (isComplete) {
-            auto claimBtnSprite = ButtonSprite::create("Claim"); claimBtnSprite->setScale(0.7f);
+            auto claimBtnSprite = ButtonSprite::create("Claim");
+            claimBtnSprite->setScale(0.7f);
+
             auto claimBtn = CCMenuItemSpriteExtra::create(claimBtnSprite, this, menu_selector(LevelProgressPopup::onClaimMission));
-            claimBtn->setTag(mission.levelID); claimBtn->setPosition({ 255.f - claimBtnSprite->getScaledContentSize().width / 2, 22.5f });
-            auto menu = CCMenu::createWithItem(claimBtn); menu->setPosition(0, 0); container->addChild(menu); container->setOpacity(255);
+            claimBtn->setTag(mission.levelID);
+            claimBtn->setPosition({ 255.f - claimBtnSprite->getScaledContentSize().width / 2, 22.5f });
+
+            auto menu = CCMenu::createWithItem(claimBtn);
+            menu->setPosition(0, 0);
+            container->addChild(menu);
+            container->setOpacity(255);
         }
         else {
             container->setOpacity(255);
@@ -474,29 +528,70 @@ protected:
         int levelID = sender->getTag();
         log::info("Attempting to claim reward for level ID: {}", levelID);
 
-        const LevelMission* missionPtr = nullptr;
-        for (const auto& m : g_levelMissions) { if (m.levelID == levelID) { missionPtr = &m; break; } }
-        if (!missionPtr) { log::error("Could not find mission data for level ID {}", levelID); FLAlertLayer::create("Error", "Mission data not found.", "OK")->show(); return; }
-        const LevelMission& mission = *missionPtr;
-
-        if (g_streakData.isLevelMissionClaimed(levelID)) { log::warn("Attempted to claim already claimed mission ID {}", levelID); FLAlertLayer::create("Error", "Mission already claimed.", "OK")->show(); updatePage(); return; }
-
-        GJGameLevel* level = GameLevelManager::sharedState()->getSavedLevel(levelID);
-        if (!level || level->m_normalPercent < 100) { log::error("Attempted to claim mission for level ID {} which is not completed!", levelID); FLAlertLayer::create("Error", "Level not completed yet.", "OK")->show(); updatePage(); return; }
-
-        g_streakData.completedLevelMissions.insert(levelID); 
-
-       
+        // --- INICIO DE LA CORRECCIÓN ---
+        // Estas variables no existían y causaban todos los errores.
         std::string rewardMessage = "";
         bool isNewBadge = false;
-        if (!mission.rewardBadgeID.empty()) { isNewBadge = !g_streakData.isBadgeUnlocked(mission.rewardBadgeID); g_streakData.unlockBadge(mission.rewardBadgeID); auto bInfo = g_streakData.getBadgeInfo(mission.rewardBadgeID); rewardMessage = fmt::format("Badge: {}", bInfo ? bInfo->displayName : "Unknown"); }
-        if (mission.secondaryRewardType == LevelRewardType::SuperStars) { g_streakData.superStars += mission.secondaryRewardQuantity; if (!rewardMessage.empty()) rewardMessage += " and "; rewardMessage += fmt::format("{} Super Stars", mission.secondaryRewardQuantity); }
-        else if (mission.secondaryRewardType == LevelRewardType::StarTickets) { g_streakData.starTickets += mission.secondaryRewardQuantity; if (!rewardMessage.empty()) rewardMessage += " and "; rewardMessage += fmt::format("{} Tickets", mission.secondaryRewardQuantity); }
+        GJGameLevel* level = GameLevelManager::sharedState()->getSavedLevel(levelID);
+        // --- FIN DE LA CORRECCIÓN ---
 
-        g_streakData.save(); 
-        updatePage(); 
+        const LevelMission* missionPtr = nullptr;
+        for (const auto& m : g_levelMissions) {
+            if (m.levelID == levelID) {
+                missionPtr = &m;
+                break;
+            }
+        }
+
+        if (!missionPtr) {
+            log::error("Could not find mission data for level ID {}", levelID);
+            FLAlertLayer::create("Error", "Mission data not found.", "OK")->show();
+            return;
+        }
+
+      
+        const LevelMission& mission = *missionPtr;
+      
+
+        if (g_streakData.isLevelMissionClaimed(levelID)) {
+            log::warn("Attempted to claim already claimed mission ID {}", levelID);
+            FLAlertLayer::create("Error", "Mission already claimed.", "OK")->show();
+            updatePage();
+            return;
+        }
+
+      
+        if (!level || level->m_normalPercent < 100) {
+            log::error("Attempted to claim mission for level ID {} which is not completed!", levelID);
+            FLAlertLayer::create("Error", "Level not completed yet.", "OK")->show();
+            updatePage();
+            return;
+        }
+
+      
+        if (!mission.rewardBadgeID.empty()) {
+            isNewBadge = !g_streakData.isBadgeUnlocked(mission.rewardBadgeID);
+            g_streakData.unlockBadge(mission.rewardBadgeID);
+            auto bInfo = g_streakData.getBadgeInfo(mission.rewardBadgeID);
+            rewardMessage = fmt::format("Badge: {}", bInfo ? bInfo->displayName : "Unknown");
+        }
+        if (mission.secondaryRewardType == LevelRewardType::SuperStars) {
+            g_streakData.superStars += mission.secondaryRewardQuantity;
+            if (!rewardMessage.empty()) rewardMessage += " and ";
+            rewardMessage += fmt::format("{} Super Stars", mission.secondaryRewardQuantity);
+        }
+        else if (mission.secondaryRewardType == LevelRewardType::StarTickets) {
+            g_streakData.starTickets += mission.secondaryRewardQuantity;
+            if (!rewardMessage.empty()) rewardMessage += " and ";
+            rewardMessage += fmt::format("{} Tickets", mission.secondaryRewardQuantity);
+        }
+
+        g_streakData.save();
+        updatePage();
+
+        
         FLAlertLayer::create("Reward Claimed!", fmt::format("You received: {}", rewardMessage), "OK")->show();
-        FMODAudioEngine::sharedEngine()->playEffect("achievement.mp3"_spr); // Sonido
+        FMODAudioEngine::sharedEngine()->playEffect("achievement.mp3"_spr);
     }
 
 
@@ -509,24 +604,41 @@ protected:
 
         float bgWidth = 300.f; float bgHeight = 180.f;
         auto background = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
-        background->setColor({ 0, 0, 0 }); background->setOpacity(120); background->setContentSize({ bgWidth, bgHeight }); background->setPosition(winSize / 2); m_mainLayer->addChild(background);
+        background->setColor({ 0, 0, 0 });
+        background->setOpacity(120);
+        background->setContentSize({ bgWidth, bgHeight });
+        background->setPosition(winSize / 2);
+        m_mainLayer->addChild(background);
 
-        m_listContainer = CCLayer::create(); m_listContainer->setContentSize(background->getContentSize()); m_listContainer->setPosition(background->getPosition() - background->getContentSize() / 2); m_listContainer->setAnchorPoint({ 0, 0 }); m_mainLayer->addChild(m_listContainer);
+        m_listContainer = CCLayer::create();
+        m_listContainer->setContentSize(background->getContentSize());
+        m_listContainer->setPosition(background->getPosition() - background->getContentSize() / 2);
+        m_listContainer->setAnchorPoint({ 0, 0 });
+        m_mainLayer->addChild(m_listContainer);
 
         auto leftSpr = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png");
-        m_leftArrow = CCMenuItemSpriteExtra::create(leftSpr, this, menu_selector(LevelProgressPopup::onSwitchPage)); m_leftArrow->setTag(-1);
-        auto rightSpr = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png"); rightSpr->setFlipX(true);
-        m_rightArrow = CCMenuItemSpriteExtra::create(rightSpr, this, menu_selector(LevelProgressPopup::onSwitchPage)); m_rightArrow->setTag(1);
-        auto arrowMenu = CCMenu::create(); arrowMenu->addChild(m_leftArrow); arrowMenu->addChild(m_rightArrow);
-        arrowMenu->alignItemsHorizontallyWithPadding(bgWidth + 15.f); arrowMenu->setPosition(winSize / 2); m_mainLayer->addChild(arrowMenu);
+        m_leftArrow = CCMenuItemSpriteExtra::create(leftSpr, this, menu_selector(LevelProgressPopup::onSwitchPage));
+        m_leftArrow->setTag(-1);
+        auto rightSpr = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png");
+        rightSpr->setFlipX(true);
+        m_rightArrow = CCMenuItemSpriteExtra::create(rightSpr, this, menu_selector(LevelProgressPopup::onSwitchPage));
+        m_rightArrow->setTag(1);
+        auto arrowMenu = CCMenu::create(); 
+        arrowMenu->addChild(m_leftArrow);
+        arrowMenu->addChild(m_rightArrow);
+        arrowMenu->alignItemsHorizontallyWithPadding(bgWidth + 15.f);
+        arrowMenu->setPosition(winSize / 2);
+        m_mainLayer->addChild(arrowMenu);
 
-        // Botón de Info
-        auto infoIcon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png"); infoIcon->setScale(0.7f);
+       
+        auto infoIcon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png");
+        infoIcon->setScale(0.7f);
         auto infoBtn = CCMenuItemSpriteExtra::create(infoIcon, this, menu_selector(LevelProgressPopup::onMissionInfo));
         auto infoMenu = CCMenu::createWithItem(infoBtn);
-        infoMenu->setPosition({ winSize.width - 25.f, winSize.height - 25.f }); m_mainLayer->addChild(infoMenu);
+        infoMenu->setPosition({ winSize.width - 25.f, winSize.height - 25.f });
+        m_mainLayer->addChild(infoMenu);
 
-        // Cargar primera página
+        
         m_currentPage = 0;
         updatePage();
 
@@ -543,7 +655,7 @@ public:
         CC_SAFE_DELETE(ret);
         return nullptr;
     }
-}; // --- Fin de la clase LevelProgressPopup ---
+}; 
 
 class GenericPrizePopup : public Popup<GenericPrizeResult, std::function<void()>> {
 protected:
@@ -889,7 +1001,7 @@ public:
 class MyCodesPopup : public Popup<> {
 protected:
     ScrollLayer* m_listLayer;
-    CCLabelBMFont* m_loadingLabel = nullptr; // NUEVO: Texto en vez de círculo
+    CCLabelBMFont* m_loadingLabel = nullptr; 
     EventListener<web::WebTask> m_listener;
 
     bool setup() override {
@@ -906,13 +1018,11 @@ protected:
         bg->setPosition(winSize / 2);
         m_mainLayer->addChild(bg);
         m_mainLayer->addChild(m_listLayer);
-
-        // --- NUEVO INDICADOR DE CARGA ---
         m_loadingLabel = CCLabelBMFont::create("Loading...", "bigFont.fnt");
         m_loadingLabel->setPosition(winSize / 2);
         m_loadingLabel->setScale(0.5f);
         m_mainLayer->addChild(m_loadingLabel, 99);
-        // --------------------------------
+        
 
         this->loadCodes();
         return true;
@@ -1008,11 +1118,11 @@ protected:
         this->setTitle("Select Badge");
 
         auto winSize = m_mainLayer->getContentSize();
-        auto listSize = CCSize{ 320.f, 180.f }; // Un poco más ancho
+        auto listSize = CCSize{ 320.f, 180.f }; 
         auto scroll = ScrollLayer::create(listSize);
         scroll->setPosition((winSize - listSize) / 2);
 
-        // Fondo oscuro para que se vea mejor
+       
         auto bg = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
         bg->setContentSize(listSize);
         bg->setColor({ 0,0,0 });
@@ -1022,7 +1132,7 @@ protected:
         m_mainLayer->addChild(scroll);
 
         auto menu = CCMenu::create();
-        menu->setPosition({ 0,0 }); // Importante para que el scroll funcione bien
+        menu->setPosition({ 0,0 }); 
 
         int cols = 4;
         float spacingX = 75.f;
@@ -1032,8 +1142,8 @@ protected:
 
         menu->setContentSize({ listSize.width, totalHeight });
 
-        float startX = (listSize.width - ((cols - 1) * spacingX)) / 2; // Centrar horizontalmente
-        float startY = totalHeight - 50.f; // Empezar desde arriba
+        float startX = (listSize.width - ((cols - 1) * spacingX)) / 2; 
+        float startY = totalHeight - 50.f; 
 
         for (int i = 0; i < g_streakData.badges.size(); ++i) {
             int col = i % cols;
@@ -1045,7 +1155,7 @@ protected:
             spr->setScale(0.4f);
 
             auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(BadgeSelectorPopup::onBadgeSelected));
-            btn->setUserObject(CCString::create(badge.badgeID));
+            btn->setUserObject("badge"_spr, CCString::create(badge.badgeID));
             btn->setPosition({ startX + col * spacingX, startY - row * spacingY });
             menu->addChild(btn);
         }
@@ -1059,7 +1169,7 @@ protected:
 
     void onBadgeSelected(CCObject* sender) {
         if (m_onSelect) {
-            m_onSelect(static_cast<CCString*>(static_cast<CCNode*>(sender)->getUserObject())->getCString());
+            m_onSelect(static_cast<CCString*>(static_cast<CCNode*>(sender)->getUserObject("badge"_spr))->getCString());
         }
         this->onClose(nullptr);
     }
@@ -1080,7 +1190,7 @@ protected:
     TextInput* m_starsInput; TextInput* m_ticketsInput;
     CCLabelBMFont* m_badgeLabel = nullptr;
     std::string m_selectedBadgeID = "";
-    CCMenuItemSpriteExtra* m_createBtn = nullptr; // NUEVO: Referencia al botón
+    CCMenuItemSpriteExtra* m_createBtn = nullptr; 
     EventListener<web::WebTask> m_createListener;
     int m_pendingStars = 0; int m_pendingTickets = 0;
 
@@ -1108,22 +1218,34 @@ protected:
         m_mainLayer->addChild(m_usesInput);
 
         float row2Y = winSize.height / 2 + 5.f;
-        auto starIcon = CCSprite::create("super_star.png"_spr); starIcon->setScale(0.2f);
-        starIcon->setPosition({ 85.f, row2Y + 22.f }); m_mainLayer->addChild(starIcon);
+        auto starIcon = CCSprite::create("super_star.png"_spr);
+        starIcon->setScale(0.2f);
+        starIcon->setPosition({ 85.f, row2Y + 22.f });
+        m_mainLayer->addChild(starIcon);
         m_starsInput = TextInput::create(110.f, "Total Stars", "chatFont.fnt");
-        m_starsInput->setPosition({ 85.f, row2Y - 8.f }); m_starsInput->setFilter("0123456789");
+        m_starsInput->setPosition({ 85.f, row2Y - 8.f });
+        m_starsInput->setFilter("0123456789");
         m_mainLayer->addChild(m_starsInput);
 
-        auto ticketIcon = CCSprite::create("star_tiket.png"_spr); ticketIcon->setScale(0.25f);
-        ticketIcon->setPosition({ 215.f, row2Y + 22.f }); m_mainLayer->addChild(ticketIcon);
+        auto ticketIcon = CCSprite::create("star_tiket.png"_spr);
+        ticketIcon->setScale(0.25f);
+        ticketIcon->setPosition({ 215.f, row2Y + 22.f });
+        m_mainLayer->addChild(ticketIcon);
         m_ticketsInput = TextInput::create(110.f, "Total Tickets", "chatFont.fnt");
-        m_ticketsInput->setPosition({ 215.f, row2Y - 8.f }); m_ticketsInput->setFilter("0123456789");
+        m_ticketsInput->setPosition({ 215.f, row2Y - 8.f });
+        m_ticketsInput->setFilter("0123456789");
         m_mainLayer->addChild(m_ticketsInput);
 
         if (isAdmin) {
             auto badgeBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Badge", 0, 0, "goldFont.fnt", "GJ_button_05.png", 0, 0.6f), this, menu_selector(CreateCodePopup::onSelectBadge));
-            auto bMenu = CCMenu::createWithItem(badgeBtn); bMenu->setPosition({ 330.f, row2Y + 12.f }); m_mainLayer->addChild(bMenu);
-            m_badgeLabel = CCLabelBMFont::create("None", "chatFont.fnt"); m_badgeLabel->setScale(0.35f); m_badgeLabel->setPosition({ 330.f, row2Y - 20.f }); m_badgeLabel->setColor({ 200, 200, 200 }); m_mainLayer->addChild(m_badgeLabel);
+            auto bMenu = CCMenu::createWithItem(badgeBtn);
+            bMenu->setPosition({ 330.f, row2Y + 12.f });
+            m_mainLayer->addChild(bMenu);
+            m_badgeLabel = CCLabelBMFont::create("None", "chatFont.fnt");
+            m_badgeLabel->setScale(0.35f);
+            m_badgeLabel->setPosition({ 330.f, row2Y - 20.f });
+            m_badgeLabel->setColor({ 200, 200, 200 });
+            m_mainLayer->addChild(m_badgeLabel);
         }
 
         // BOTÓN CREAR (Guardamos referencia en m_createBtn)
@@ -1136,37 +1258,69 @@ protected:
         return true;
     }
 
-    void onOpenMyCodes(CCObject*) { MyCodesPopup::create()->show(); }
-    void onSelectBadge(CCObject*) { BadgeSelectorPopup::create([this](std::string id) { m_selectedBadgeID = id; if (m_badgeLabel) { m_badgeLabel->setString(id.c_str()); m_badgeLabel->setColor({ 0, 255, 100 }); } })->show(); }
+    void onOpenMyCodes(CCObject*) {
+        MyCodesPopup::create()->show();
+    }
+
+
+    void onSelectBadge(CCObject*) {
+        BadgeSelectorPopup::create([this](std::string id) { m_selectedBadgeID = id;
+        if (m_badgeLabel) { m_badgeLabel->setString(id.c_str());
+        m_badgeLabel->setColor({ 0, 255, 100 });
+             } 
+          }
+       )->show();
+    }
 
     void onCreate(CCObject*) {
         std::string name = m_nameInput->getString(); std::string usesStr = m_usesInput->getString();
-        if (name.empty() || usesStr.empty()) { Notification::create("Name and Uses required", NotificationIcon::Error)->show(); return; }
-        int uses = std::stoi(usesStr); if (uses <= 0) { Notification::create("Invalid uses", NotificationIcon::Error)->show(); return; }
-        m_pendingStars = m_starsInput->getString().empty() ? 0 : std::stoi(m_starsInput->getString());
-        m_pendingTickets = m_ticketsInput->getString().empty() ? 0 : std::stoi(m_ticketsInput->getString());
-
-        if (m_pendingStars == 0 && m_pendingTickets == 0 && m_selectedBadgeID.empty()) { Notification::create("Add rewards", NotificationIcon::Error)->show(); return; }
-        if (m_pendingStars > 0 && m_pendingStars % uses != 0) { Notification::create("Stars must split evenly", NotificationIcon::Error)->show(); return; }
-        if (m_pendingTickets > 0 && m_pendingTickets % uses != 0) { Notification::create("Tickets must split evenly", NotificationIcon::Error)->show(); return; }
-
-        if (g_streakData.userRole < 2) {
-            if (m_pendingStars > g_streakData.superStars) { Notification::create("Not enough Super Stars!", NotificationIcon::Error)->show(); return; }
-            if (m_pendingTickets > g_streakData.starTickets) { Notification::create("Not enough Star Tickets!", NotificationIcon::Error)->show(); return; }
+        if (name.empty() || usesStr.empty()) {
+            Notification::create("Name and Uses required", NotificationIcon::Error)->show();
+            return;
+        }
+        int uses = numFromString<int>(usesStr).unwrapOrDefault();
+        if (uses <= 0) {
+            Notification::create("Invalid uses", NotificationIcon::Error)->show();
+            return;
+        }
+       
+        if (m_pendingStars == 0 && m_pendingTickets == 0 && m_selectedBadgeID.empty()) {
+            Notification::create("Add rewards", NotificationIcon::Error)->show();
+            return;
+        }
+        if (m_pendingStars > 0 && m_pendingStars % uses != 0) {
+            Notification::create("Stars must split evenly", NotificationIcon::Error)->show();
+            return;
+        }
+        if (m_pendingTickets > 0 && m_pendingTickets % uses != 0) {
+            Notification::create("Tickets must split evenly", NotificationIcon::Error)->show();
+            return;
+        }
+       
+        if (m_pendingStars > g_streakData.superStars) {
+            Notification::create("Not enough Super Stars!", NotificationIcon::Error)->show();
+            return;
+        }
+        if (m_pendingTickets > g_streakData.starTickets) {
+            Notification::create("Not enough Star Tickets!", NotificationIcon::Error)->show();
+            return;
         }
 
-        // --- CAMBIO DE ESTADO DEL BOTÓN A "LOADING..." ---
+      
         m_createBtn->setEnabled(false);
         m_createBtn->setNormalImage(ButtonSprite::create("Loading...", 0, 0, "goldFont.fnt", "GJ_button_01.png", 0, 1.0f));
-        // -------------------------------------------------
+        
 
         matjson::Value rewards = matjson::Value::object();
         if (m_pendingStars > 0) rewards.set("super_stars", m_pendingStars);
         if (m_pendingTickets > 0) rewards.set("star_tickets", m_pendingTickets);
         if (!m_selectedBadgeID.empty()) rewards.set("badge", m_selectedBadgeID);
         matjson::Value payload = matjson::Value::object();
-        payload.set("modAccountID", GJAccountManager::sharedState()->m_accountID); payload.set("codeName", name); payload.set("maxUses", uses); payload.set("rewards", rewards);
-        auto req = web::WebRequest(); m_createListener.setFilter(req.bodyJSON(payload).post("https://streak-servidor.onrender.com/create-code"));
+        payload.set("modAccountID", GJAccountManager::sharedState()->m_accountID); payload.set("codeName", name);
+        payload.set("maxUses", uses);
+        payload.set("rewards", rewards);
+        auto req = web::WebRequest();
+        m_createListener.setFilter(req.bodyJSON(payload).post("https://streak-servidor.onrender.com/create-code"));
     }
 
     void onWebResponse(web::WebTask::Event* e) {
@@ -1174,13 +1328,15 @@ protected:
 
         if (web::WebResponse* res = e->getValue()) {
             if (res->ok()) {
-                if (g_streakData.userRole < 2) { g_streakData.superStars -= m_pendingStars; g_streakData.starTickets -= m_pendingTickets; g_streakData.save(); }
-                // ÉXITO: El popup se cierra, no hace falta restaurar el botón
+                if (g_streakData.userRole < 2) { g_streakData.superStars -= m_pendingStars;
+                g_streakData.starTickets -= m_pendingTickets;
+                g_streakData.save(); }
+              
                 FLAlertLayer::create("Success", "Code Created Successfully!", "OK")->show();
                 this->onClose(nullptr);
             }
             else {
-                // ERROR: Restauramos el botón a "Create"
+              
                 m_createBtn->setEnabled(true);
                 m_createBtn->setNormalImage(ButtonSprite::create("Create", 0, 0, "goldFont.fnt", "GJ_button_01.png", 0, 1.0f));
 
@@ -1190,7 +1346,7 @@ protected:
             }
         }
         else {
-            // ERROR DE RED: Restauramos el botón
+          
             m_createBtn->setEnabled(true);
             m_createBtn->setNormalImage(ButtonSprite::create("Create", 0, 0, "goldFont.fnt", "GJ_button_01.png", 0, 1.0f));
             Notification::create("Connection Failed", NotificationIcon::Error)->show();
@@ -1209,7 +1365,7 @@ public:
 class RedeemCodePopup : public Popup<> {
 protected:
     TextInput* m_textInput;
-    CCMenuItemSpriteExtra* m_redeemBtn; // NUEVO: Referencia al botón
+    CCMenuItemSpriteExtra* m_redeemBtn;
     EventListener<web::WebTask> m_redeemListener;
     bool m_isRequesting = false;
 
@@ -1222,8 +1378,6 @@ protected:
         m_textInput->setFilter("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-");
         m_textInput->setMaxCharCount(24);
         m_mainLayer->addChild(m_textInput);
-
-        // BOTÓN REDEEM (Guardamos referencia)
         m_redeemBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Redeem", 0, 0, "goldFont.fnt", "GJ_button_01.png", 0, 1.0f), this, menu_selector(RedeemCodePopup::onOk));
         auto menu = CCMenu::createWithItem(m_redeemBtn);
         menu->setPosition({ winSize.width / 2, winSize.height / 2 - 45.f });
@@ -1254,10 +1408,10 @@ protected:
 
         m_isRequesting = true;
         
-        // --- CAMBIO DE ESTADO DEL BOTÓN ---
+       
         m_redeemBtn->setEnabled(false);
         m_redeemBtn->setNormalImage(ButtonSprite::create("Loading...", 0, 0, "goldFont.fnt", "GJ_button_01.png", 0, 1.0f));
-        // ----------------------------------
+       
 
         matjson::Value payload = matjson::Value::object();
         payload.set("code", code);
@@ -1273,7 +1427,6 @@ protected:
         if (web::WebResponse* res = e->getValue()) {
             if (res->ok() && res->json().isOk()) {
                 auto json = res->json().unwrap();
-                // Actualizar datos locales
                 if (json.contains("rewards")) {
                     auto r = json["rewards"];
                     if (r.contains("super_stars")) g_streakData.superStars += r["super_stars"].as<int>().unwrapOr(0);
@@ -1409,13 +1562,13 @@ protected:
             CCMenuItemSpriteExtra* buyBtn = CCMenuItemSpriteExtra::create(
                 itemNode, this, menu_selector(ShopPopup::onBuyItem)
             );
-            buyBtn->setUserObject(CCString::create(badge->badgeID));
+            buyBtn->setUserObject("badge"_spr, CCString::create(badge->badgeID));
             buyBtn->setPosition({ startPos.x + col * spacingX, startPos.y - row * spacingY });
             m_itemMenu->addChild(buyBtn);
             if (g_streakData.isBadgeUnlocked(badge->badgeID)) {
                 buyBtn->setEnabled(false);
                 for (auto* child : CCArrayExt<CCNode*>(itemNode->getChildren())) {
-                    if (auto* rgbaNode = dynamic_cast<CCRGBAProtocol*>(child)) {
+                    if (auto* rgbaNode = typeinfo_cast<CCRGBAProtocol*>(child)) {
                         rgbaNode->setOpacity(100);
                     }
                 }
@@ -1429,7 +1582,7 @@ protected:
     }
 
     void onBuyItem(CCObject* sender) {
-        std::string badgeID = static_cast<CCString*>(static_cast<CCNode*>(sender)->getUserObject())->getCString();
+        std::string badgeID = static_cast<CCString*>(static_cast<CCNode*>(sender)->getUserObject("badge"_spr))->getCString();
         auto badgeInfo = g_streakData.getBadgeInfo(badgeID);
         if (!badgeInfo) return;
         int price = m_shopItems[badgeID];
@@ -1491,7 +1644,7 @@ protected:
     std::vector<StreakData::BadgeInfo> m_pendingMythics;
 
     void runPopAnimation(CCObject* sender) {
-        if (auto node = dynamic_cast<CCNode*>(sender)) {
+        if (auto node = typeinfo_cast<CCNode*>(sender)) {
             auto popAction = CCSequence::create(
                 CCScaleTo::create(0.025f, 1.1f),
                 CCScaleTo::create(0.025f, 1.0f),
@@ -1502,7 +1655,7 @@ protected:
     }
 
     void runSlotAnimation(CCObject* sender) {
-        if (auto node = dynamic_cast<CCNode*>(sender)) {
+        if (auto node = typeinfo_cast<CCNode*>(sender)) {
             auto popAction = CCSequence::create(
                 CCScaleTo::create(0.02f, 1.1f),
                 CCScaleTo::create(0.02f, 1.0f),
@@ -1547,10 +1700,29 @@ protected:
         const float totalSize = (gridSize * m_slotSize) + ((gridSize - 1) * spacing);
         const float startPos = -totalSize / 2.f + m_slotSize / 2.f;
         std::vector<CCPoint> slotPositions;
-        for (int i = 0; i < gridSize; ++i) slotPositions.push_back({ startPos + i * (m_slotSize + spacing), startPos + (gridSize - 1) * (m_slotSize + spacing) });
-        for (int i = gridSize - 2; i > 0; --i) slotPositions.push_back({ startPos + (gridSize - 1) * (m_slotSize + spacing), startPos + i * (m_slotSize + spacing) });
-        for (int i = gridSize - 1; i >= 0; --i) slotPositions.push_back({ startPos + i * (m_slotSize + spacing), startPos });
-        for (int i = 1; i < gridSize - 1; ++i) slotPositions.push_back({ startPos, startPos + i * (m_slotSize + spacing) });
+
+        for (int i = 0; i < gridSize; ++i) slotPositions.push_back({
+            startPos + i * (m_slotSize + spacing),
+            startPos + (gridSize - 1) * (m_slotSize + spacing)
+            }
+        );
+
+        for (int i = gridSize - 2; i > 0; --i) slotPositions.push_back({
+            startPos + (gridSize - 1) * (m_slotSize + spacing),
+            startPos + i * (m_slotSize + spacing)
+            }
+        );
+
+        for (int i = gridSize - 1; i >= 0; --i) slotPositions.push_back({
+            startPos + i * (m_slotSize + spacing), startPos
+            }
+        );
+
+        for (int i = 1; i < gridSize - 1; ++i) slotPositions.push_back({
+            startPos, startPos + i * (m_slotSize + spacing)
+            }
+        );
+
         for (size_t i = 0; i < slotPositions.size(); ++i) {
             if (i >= m_roulettePrizes.size()) continue;
             auto& currentPrize = m_roulettePrizes[i];
@@ -1566,6 +1738,7 @@ protected:
             auto qualitySprite = CCSprite::create(getQualitySpriteName(currentPrize.category).c_str());
             qualitySprite->setScale((m_slotSize - 4.f) / qualitySprite->getContentSize().width);
             slotContainer->addChild(qualitySprite, 1);
+
             if (currentPrize.category == StreakData::BadgeCategory::MYTHIC) m_mythicSprites.push_back(qualitySprite);
             if (currentPrize.type == RewardType::Badge) {
                 auto* badgeInfo = g_streakData.getBadgeInfo(currentPrize.id);
@@ -2600,11 +2773,10 @@ public:
     }
 };
 
-// --- (COPIA Y REEMPLAZA ESTO ANTES DE LA CLASE InfoPopup EN Popups.h) ---
 
 class DonationPopup : public Popup<> {
 protected:
-    // --- Callbacks (Sin cambios) ---
+   
     void onConfirmKofi(bool btn2) {
         if (btn2) {
             cocos2d::CCApplication::sharedApplication()->openURL("https://ko-fi.com/streakservers");
@@ -2633,21 +2805,19 @@ protected:
         );
     }
 
-    // --- Función setup (Layout reajustado) ---
+  
     bool setup() override {
         this->setTitle("Support the Mod");
-        auto winSize = this->m_mainLayer->getContentSize(); // Tamaño del popup (Ahora 280x200)
+        auto winSize = this->m_mainLayer->getContentSize(); 
 
         auto menu = CCMenu::create();
         menu->setPosition(0, 0);
         this->m_mainLayer->addChild(menu);
 
-        // 1. Banner promocional
+      
         auto banner = CCSprite::create("support_banner.png"_spr);
         if (banner) {
-            // Posicionamos el banner "en el medio" (verticalmente)
-            banner->setPosition({ winSize.width / 2, winSize.height / 2 + 15.f }); // Y = 115
-            // Lo hacemos "un poco más grande"
+            banner->setPosition({ winSize.width / 2, winSize.height / 2 + 15.f }); 
             banner->setScale(0.7f);
             this->m_mainLayer->addChild(banner);
         }
@@ -2655,23 +2825,22 @@ protected:
             log::error("No se pudo encontrar support_banner.png");
         }
 
-        // 2. Botón para ir a Ko-fi
+       
         auto kofiBtnSprite = ButtonSprite::create("Go to Ko-fi", 0, 0, "goldFont.fnt", "GJ_button_01.png", 0, 0.8f);
         kofiBtnSprite->setScale(0.8f);
         auto kofiBtn = CCMenuItemSpriteExtra::create(
             kofiBtnSprite, this, menu_selector(DonationPopup::onGoToKofi)
         );
-        // Posicionamos el botón "abajo del pup"
-        kofiBtn->setPosition({ winSize.width / 2, 40.f }); // Y = 40 (cerca del fondo)
+        
+        kofiBtn->setPosition({ winSize.width / 2, 40.f }); 
         menu->addChild(kofiBtn);
 
-        // 3. Botón de información (GJ_infoIcon_001.png)
+     
         auto infoIcon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png");
         infoIcon->setScale(0.8f);
         auto infoBtn = CCMenuItemSpriteExtra::create(
             infoIcon, this, menu_selector(DonationPopup::onOpenDiscordInfo)
         );
-        // Posicionamos el botón en la esquina inferior izquierda
         infoBtn->setPosition({ 35.f, 35.f });
         menu->addChild(infoBtn);
 
@@ -2679,12 +2848,12 @@ protected:
     }
 
 public:
-    // --- Función create (Tamaño 200px de alto) ---
+
     static DonationPopup* create() {
         auto ret = new DonationPopup();
 
-        // Volvemos a 200px de alto para dar espacio
-        if (ret && ret->initAnchored(280.f, 200.f)) { // (ancho, alto)
+      
+        if (ret && ret->initAnchored(280.f, 200.f)) {
             ret->autorelease();
             return ret;
         }
@@ -2708,13 +2877,13 @@ protected:
         float cellHeight = 40.f;
         this->setContentSize({ cellWidth, cellHeight });
 
-        // --- NOMBRE VERDE SI ES LOCAL ---
+       
         ccColor3B nameColor = { 255, 255, 255 };
         if (isLocalPlayer) {
             nameColor = { 0, 255, 100 };
         }
 
-        // --- RANGO (SPRITE O TEXTO) ---
+      
         if (rank >= 1 && rank <= 3) {
             std::string spriteName = fmt::format("top{}.png"_spr, rank);
             auto rankSprite = CCSprite::create(spriteName.c_str());
@@ -2725,22 +2894,21 @@ protected:
             rankSprite->setPosition({ 25.f, cellHeight / 2 });
             this->addChild(rankSprite);
 
-            // --- EFECTO ESPECIAL PARA EL TOP 1 ---
+           
             if (rank == 1) {
-                // 1. Brillo giratorio detrás
+              
                 auto glowSprite = CCSprite::createWithSpriteFrameName("shineBurst_001.png");
                 if (glowSprite) {
-                    glowSprite->setColor({ 255, 200, 0 }); // Dorado intenso
-                    // --- CORRECCIÓN: Escala aumentada de 1.2f a 3.0f para que se vea bien ---
+                    glowSprite->setColor({ 255, 200, 0 });                 
                     glowSprite->setScale(3.0f);
-                    glowSprite->setOpacity(150); // Semitransparente
+                    glowSprite->setOpacity(150); 
                     glowSprite->setPosition(rankSprite->getContentSize() / 2);
                     glowSprite->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
                     glowSprite->runAction(CCRepeatForever::create(CCRotateBy::create(4.0f, 360.f)));
                     rankSprite->addChild(glowSprite, -1);
                 }
 
-                // 2. Suave pulsación del icono principal
+               
                 auto pulseSequence = CCSequence::create(
                     CCEaseSineInOut::create(CCScaleTo::create(0.8f, 0.38f)),
                     CCEaseSineInOut::create(CCScaleTo::create(0.8f, 0.35f)),
@@ -2748,7 +2916,7 @@ protected:
                 );
                 rankSprite->runAction(CCRepeatForever::create(pulseSequence));
             }
-            // ------------------------------------
+         
         }
         else {
         use_text_rank:
@@ -2762,7 +2930,7 @@ protected:
             this->addChild(rankLabel);
         }
 
-        // --- INSIGNIA ---
+      
         std::string badgeID = playerData["equipped_badge_id"].as<std::string>().unwrapOr("");
         if (!badgeID.empty()) {
             if (auto badgeInfo = g_streakData.getBadgeInfo(badgeID)) {
@@ -2775,7 +2943,7 @@ protected:
             }
         }
 
-        // --- NOMBRE DE USUARIO ---
+       
         std::string username = playerData["username"].as<std::string>().unwrapOr("-");
         auto usernameLabel = CCLabelBMFont::create(username.c_str(), "goldFont.fnt");
         usernameLabel->limitLabelWidth(120.f, 0.6f, 0.1f);
@@ -2791,7 +2959,7 @@ protected:
         menu->setPosition({ 0, 0 });
         this->addChild(menu);
 
-        // --- DÍAS DE RACHA ---
+       
         int streakDays = playerData["current_streak_days"].as<int>().unwrapOr(0);
         std::string spriteName = g_streakData.getRachaSprite(streakDays);
         auto streakIcon = CCSprite::create(spriteName.c_str());
@@ -2806,7 +2974,7 @@ protected:
         streakLabel->setPosition({ streakIcon->getPositionX() + 12.f, cellHeight / 2 });
         this->addChild(streakLabel);
 
-        // --- PUNTOS ---
+       
         int streakPoints = playerData["total_streak_points"].as<int>().unwrapOr(0);
         auto pointIcon = CCSprite::create("streak_point.png"_spr);
         pointIcon->setScale(0.12f);
@@ -2854,8 +3022,9 @@ protected:
         int m_totalPages = 0;
         const int m_itemsPerPage = 5;
         CCLabelBMFont* m_errorLabel = nullptr;
-        CCLabelBMFont* m_myRankLabel = nullptr; // NUEVO: Solo una etiqueta de texto
+        CCLabelBMFont* m_myRankLabel = nullptr;
     };
+
     Fields m_fields;
 
     void buildList(const matjson::Value& playersValue, CCSize listSize, CCSize winSize) {
@@ -2903,7 +3072,7 @@ protected:
                     if (this->m_fields.m_totalPages == 0) this->m_fields.m_totalPages = 1;
                     this->m_fields.m_currentPage = 0;
 
-                    // --- Buscar rango local ---
+                 
                     int myRank = -1;
                     int localAccountID = GJAccountManager::sharedState()->m_accountID;
                     if (localAccountID != 0) {
@@ -2915,11 +3084,11 @@ protected:
                         }
                     }
 
-                    // --- Actualizar la etiqueta de estadística ---
+                   
                     if (this->m_fields.m_myRankLabel) {
                         std::string rankText = (myRank != -1) ? fmt::format("My Rank: #{}", myRank) : "My Rank: Unranked";
                         this->m_fields.m_myRankLabel->setString(rankText.c_str());
-                        this->m_fields.m_myRankLabel->setColor({ 255, 215, 0 }); // Color dorado para destacar un poco
+                        this->m_fields.m_myRankLabel->setColor({ 255, 215, 0 }); 
                     }
 
                     this->buildList(data, listSize, winSize);
@@ -2934,7 +3103,7 @@ protected:
         }
     }
 
-    // ... (updatePageControls, onPrevPage, onNextPage, showError IGUALES) ...
+  
     void updatePageControls() {
         bool hasData = !this->m_fields.m_leaderboardData.empty();
         bool showError = this->m_fields.m_errorLabel != nullptr;
@@ -2950,13 +3119,17 @@ protected:
     void onPrevPage(CCObject*) {
         if (this->m_fields.m_currentPage > 0) {
             this->m_fields.m_currentPage--;
-            this->buildList(matjson::Value(this->m_fields.m_leaderboardData), this->m_fields.m_listContainer->getContentSize(), this->m_mainLayer->getContentSize());
+            this->buildList(matjson::Value(this->m_fields.m_leaderboardData), 
+            this->m_fields.m_listContainer->getContentSize(),
+            this->m_mainLayer->getContentSize());
         }
     }
     void onNextPage(CCObject*) {
         if (this->m_fields.m_currentPage < this->m_fields.m_totalPages - 1) {
             this->m_fields.m_currentPage++;
-            this->buildList(matjson::Value(this->m_fields.m_leaderboardData), this->m_fields.m_listContainer->getContentSize(), this->m_mainLayer->getContentSize());
+            this->buildList(matjson::Value(this->m_fields.m_leaderboardData),
+            this->m_fields.m_listContainer->getContentSize(),
+            this->m_mainLayer->getContentSize());
         }
     }
     void showError(std::string error) {
@@ -2976,12 +3149,11 @@ protected:
         this->setTitle("Top Streaks");
         auto winSize = this->m_mainLayer->getContentSize();
 
-        // 1. Lista Principal
+       
         auto listBg = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
         listBg->setColor({ 0, 0, 0 }); listBg->setOpacity(120);
         CCSize listSize = { 300.f, 210.f };
         listBg->setContentSize(listSize);
-        // --- CORRECCIÓN: Bajamos la lista un poco más (-5.f desde el centro) ---
         listBg->setPosition({ winSize.width / 2, winSize.height / 2 - 5.f });
         this->m_mainLayer->addChild(listBg);
 
@@ -2990,24 +3162,24 @@ protected:
         this->m_fields.m_listContainer->setPosition(listBg->getPosition() - listBg->getContentSize() / 2);
         this->m_mainLayer->addChild(this->m_fields.m_listContainer);
 
-        // 2. Etiqueta de "Mi Rango"
+      
         this->m_fields.m_myRankLabel = CCLabelBMFont::create("My Rank: ...", "goldFont.fnt");
         this->m_fields.m_myRankLabel->setScale(0.5f);
         this->m_fields.m_myRankLabel->setAnchorPoint({ 0.f, 0.5f });
-        // --- CORRECCIÓN: Bajamos un poco el texto para que no choque con la lista ---
+      
         this->m_fields.m_myRankLabel->setPosition({ 22.f, 18.f });
         this->m_fields.m_myRankLabel->setColor({ 200, 200, 200 });
         this->m_mainLayer->addChild(this->m_fields.m_myRankLabel);
 
-        // Flechas - Ajustadas a la nueva altura de la lista (-5.f)
+      
         auto sprLeft = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png");
         this->m_fields.m_leftArrow = CCMenuItemSpriteExtra::create(sprLeft, this, menu_selector(LeaderboardPopup::onPrevPage));
-        this->m_fields.m_leftArrow->setPosition({ -175.f, -5.f }); // Ajustado Y
+        this->m_fields.m_leftArrow->setPosition({ -175.f, -5.f }); 
         this->m_fields.m_leftArrow->setVisible(false);
 
         auto sprRight = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png"); sprRight->setFlipX(true);
         this->m_fields.m_rightArrow = CCMenuItemSpriteExtra::create(sprRight, this, menu_selector(LeaderboardPopup::onNextPage));
-        this->m_fields.m_rightArrow->setPosition({ 175.f, -5.f }); // Ajustado Y
+        this->m_fields.m_rightArrow->setPosition({ 175.f, -5.f }); 
         this->m_fields.m_rightArrow->setVisible(false);
 
         auto arrowMenu = CCMenu::create();
@@ -3016,7 +3188,7 @@ protected:
         arrowMenu->setPosition(winSize / 2);
         this->m_mainLayer->addChild(arrowMenu);
 
-        // ... (resto igual)
+        
         this->m_fields.m_loadingCircle = LoadingCircle::create();
         this->m_fields.m_loadingCircle->setPosition(winSize / 2);
         this->m_fields.m_loadingCircle->show();
@@ -3064,11 +3236,18 @@ protected:
         auto winSize = m_mainLayer->getContentSize();
         g_streakData.load();
         m_mythicColors = {
-            ccc3(255, 0, 0), ccc3(255, 165, 0), ccc3(255, 255, 0),
-            ccc3(0, 255, 0), ccc3(0, 0, 255), ccc3(75, 0, 130),
-            ccc3(238, 130, 238), ccc3(255, 105, 180), ccc3(255, 215, 0),
+            ccc3(255, 0, 0),
+            ccc3(255, 165, 0),
+            ccc3(255, 255, 0),
+            ccc3(0, 255, 0),
+            ccc3(0, 0, 255),
+            ccc3(75, 0, 130),
+            ccc3(238, 130, 238),
+            ccc3(255, 105, 180),
+            ccc3(255, 215, 0),
             ccc3(192, 192, 192)
         };
+
         m_colorIndex = 0;
         m_currentColor = m_mythicColors[0];
         m_targetColor = m_mythicColors[1];
@@ -3138,6 +3317,7 @@ protected:
             static_cast<GLubyte>(m_currentColor.g + (m_targetColor.g - m_currentColor.g) * progress),
             static_cast<GLubyte>(m_currentColor.b + (m_targetColor.b - m_currentColor.b) * progress)
         };
+
         m_categoryLabel->setColor(interpolatedColor);
     }
 
@@ -3178,7 +3358,7 @@ protected:
             CCMenuItemSpriteExtra* badgeBtn;
             if (unlocked) {
                 badgeBtn = CCMenuItemSpriteExtra::create(badgeSprite, this, menu_selector(RewardsPopup::onBadgeClick));
-                badgeBtn->setUserObject(CCString::create(badge.badgeID));
+                badgeBtn->setUserObject("badge"_spr, CCString::create(badge.badgeID));
             }
             else {
                 badgeBtn = CCMenuItemSpriteExtra::create(badgeSprite, this, nullptr);
@@ -3212,7 +3392,7 @@ protected:
     }
 
     void onBadgeClick(CCObject* sender) {
-        auto badgeID = static_cast<CCString*>(static_cast<CCNode*>(sender)->getUserObject())->getCString();
+        auto badgeID = static_cast<CCString*>(static_cast<CCNode*>(sender)->getUserObject("badge"_spr))->getCString();
         EquipBadgePopup::create(badgeID)->show();
     }
 
@@ -3285,8 +3465,17 @@ public:
         auto particle = CCSprite::create("cuadro.png"_spr);
         if (!particle) return;
         particle->setPosition({ 0, 0 });
-        particle->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
-        std::vector<ccColor3B> colors = { {255, 255, 255}, {255, 215, 0}, {255, 165, 0}, {255, 255, 150} };
+        particle->setBlendFunc({ 
+            GL_SRC_ALPHA,
+            GL_ONE 
+            }
+        );
+        std::vector<ccColor3B> colors = {
+            {255, 255, 255},
+            {255, 215, 0},
+            {255, 165, 0},
+            {255, 255, 150}
+        };
         particle->setColor(colors[rand() % colors.size()]);
         particle->setOpacity(200);
         particle->setScale(0.05f + (static_cast<float>(rand() % 10) / 100.0f));
@@ -3351,7 +3540,7 @@ protected:
 
         m_idInput = TextInput::create(200.f, "Target Account ID", "chatFont.fnt");
         m_idInput->setPosition({ winSize.width / 2, winSize.height / 2 + 35.f });
-        m_idInput->setFilter("0123456789"); // Solo permite números
+        m_idInput->setFilter("0123456789");
         m_mainLayer->addChild(m_idInput);
 
         m_reasonInput = TextInput::create(200.f, "Ban Reason (Optional for Unban)", "chatFont.fnt");
@@ -3390,7 +3579,7 @@ protected:
             return;
         }
 
-        // Validación extra para asegurar que solo contiene dígitos
+        
         if (!std::all_of(targetIDStr.begin(), targetIDStr.end(), ::isdigit)) {
             Notification::create("Invalid ID format!", NotificationIcon::Error)->show();
             return;
@@ -3409,7 +3598,7 @@ protected:
             Notification::create("Account ID required!", NotificationIcon::Error)->show();
             return;
         }
-        // Validación extra
+     
         if (!std::all_of(targetIDStr.begin(), targetIDStr.end(), ::isdigit)) {
             Notification::create("Invalid ID format!", NotificationIcon::Error)->show();
             return;
@@ -3425,11 +3614,8 @@ protected:
     void sendRequest(std::string endpoint, std::string targetIDStr, std::string reason) {
         m_buttonMenu->setEnabled(false);
 
-        int targetID;
-        try {
-            targetID = std::stoi(targetIDStr);
-        }
-        catch (...) {
+        auto targetID = numFromString<int>(targetIDStr);
+        if (!targetID.isOk()) {
             Notification::create("Invalid ID number!", NotificationIcon::Error)->show();
             m_buttonMenu->setEnabled(true);
             return;
@@ -3438,7 +3624,7 @@ protected:
         auto am = GJAccountManager::sharedState();
         matjson::Value payload = matjson::Value::object();
         payload.set("modAccountID", am->m_accountID);
-        payload.set("targetAccountID", targetID);
+        payload.set("targetAccountID", targetID.unwrap());
         if (!reason.empty()) payload.set("reason", reason);
 
         auto req = web::WebRequest();
@@ -3452,7 +3638,7 @@ protected:
 
         if (web::WebResponse* res = e->getValue()) {
             if (res->ok()) {
-                // Intentar leer mensaje de éxito del servidor si existe
+               
                 std::string successMsg = "Action completed successfully!";
                 if (res->json().isOk()) {
                     successMsg = res->json().unwrap()["message"].as<std::string>().unwrapOr(successMsg);
@@ -3461,7 +3647,7 @@ protected:
                 this->onClose(nullptr);
             }
             else {
-                // Intentar leer el mensaje de error del JSON
+              
                 std::string errorMsg = fmt::format("Error: Server returned {}", res->code());
                 if (res->json().isOk()) {
                     errorMsg = res->json().unwrap()["error"].as<std::string>().unwrapOr(errorMsg);
@@ -3493,7 +3679,7 @@ protected:
     CCNode* m_viewLayer = nullptr;
     CCNode* m_writeLayer = nullptr;
     CCMenuItemSpriteExtra* m_toggleBtn = nullptr;
-    CCMenuItemSpriteExtra* m_banBtn = nullptr; // NUEVO: Referencia al botón de ban
+    CCMenuItemSpriteExtra* m_banBtn = nullptr; 
     TextInput* m_textInput = nullptr;
     CCMenuItemSpriteExtra* m_sendBtn = nullptr;
     LoadingCircle* m_loadingCircle = nullptr;
@@ -3508,7 +3694,7 @@ protected:
         this->setTitle("Advertisements");
         auto winSize = m_mainLayer->getContentSize();
 
-        // --- CAPA DE VISUALIZACIÓN ---
+      
         m_viewLayer = CCNode::create();
         m_viewLayer->setContentSize(winSize);
         m_mainLayer->addChild(m_viewLayer);
@@ -3525,7 +3711,7 @@ protected:
         bg->setPosition(winSize / 2 + CCPoint{ 0, 10.f });
         m_viewLayer->addChild(bg, -1);
 
-        // --- CAPA DE ESCRITURA ---
+       
         m_writeLayer = CCNode::create();
         m_writeLayer->setVisible(false);
         m_mainLayer->addChild(m_writeLayer);
@@ -3536,16 +3722,21 @@ protected:
         m_textInput->setFilter(" abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?'\"-()@#&<>\\/");
         m_writeLayer->addChild(m_textInput);
 
-        // Herramientas de color y texto
+      
         auto toolsMenu = CCMenu::create();
         toolsMenu->setPosition({ winSize.width / 2, winSize.height / 2 + 35.f });
         m_writeLayer->addChild(toolsMenu);
 
         struct ColorDef { ccColor3B color; int tag; std::string labelStr; };
         std::vector<ColorDef> colors = {
-            {{255, 80, 80}, 1, "cr"}, {{255, 160, 50}, 2, "co"}, {{255, 255, 0}, 3, "cy"},
-            {{80, 255, 80}, 4, "cg"}, {{0, 4, 168}, 5, "cb"}, {{255, 120, 255}, 6, "cp"}
+            {{255, 80, 80}, 1, "cr"},
+            {{255, 160, 50}, 2, "co"},
+            {{255, 255, 0}, 3, "cy"},
+            {{80, 255, 80}, 4, "cg"},
+            {{0, 4, 168}, 5, "cb"},
+            {{255, 120, 255}, 6, "cp"}
         };
+
         float startX = -((colors.size() + 2) * 25.f) / 2.f + 12.5f;
         for (int i = 0; i < colors.size(); ++i) {
             auto spr = CCSprite::createWithSpriteFrameName("GJ_colorBtn_001.png");
@@ -3563,9 +3754,13 @@ protected:
         }
         float buttonsX = startX + colors.size() * 25.f + 15.f;
         auto enterBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("NL", 20, 0, 0.4f, true, "goldFont.fnt", "GJ_button_01.png", 30.f), this, menu_selector(SendMessagePopup::onNewLine));
-        enterBtn->setPosition({ buttonsX, 0 }); enterBtn->setScale(0.8f); toolsMenu->addChild(enterBtn);
+        enterBtn->setPosition({ buttonsX, 0 });
+        enterBtn->setScale(0.8f);
+        toolsMenu->addChild(enterBtn);
         auto prevBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Pre", 25, 0, 0.4f, true, "goldFont.fnt", "GJ_button_01.png", 30.f), this, menu_selector(SendMessagePopup::onPreview));
-        prevBtn->setPosition({ buttonsX + 35.f, 0 }); prevBtn->setScale(0.8f); toolsMenu->addChild(prevBtn);
+        prevBtn->setPosition({ buttonsX + 35.f, 0 });
+        prevBtn->setScale(0.8f);
+        toolsMenu->addChild(prevBtn);
 
         m_sendBtn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Send", 0, 0, "goldFont.fnt", "GJ_button_01.png", 0, 0.8f), this, menu_selector(SendMessagePopup::onSend));
         auto clearBtn = CCMenuItemSpriteExtra::create(CCSprite::createWithSpriteFrameName("GJ_trashBtn_001.png"), this, menu_selector(SendMessagePopup::onClearText));
@@ -3576,29 +3771,19 @@ protected:
         sendMenu->setPosition({ winSize.width / 2, 40.f });
         m_writeLayer->addChild(sendMenu);
 
-        // --- HERRAMIENTAS DE MODERADOR ---
+        
         if (g_streakData.userRole >= 1) {
             auto editSpr = CCSprite::createWithSpriteFrameName("GJ_chatBtn_001.png");
             editSpr->setScale(0.8f);
             m_toggleBtn = CCMenuItemSpriteExtra::create(editSpr, this, menu_selector(SendMessagePopup::onToggleMode));
-
             auto hammerSpr = CCSprite::createWithSpriteFrameName("GJ_reportBtn_001.png");
             hammerSpr->setScale(0.8f);
             m_banBtn = CCMenuItemSpriteExtra::create(hammerSpr, this, menu_selector(SendMessagePopup::onOpenBanTool));
-
             auto modMenu = CCMenu::create();
             modMenu->addChild(m_banBtn);
             modMenu->addChild(m_toggleBtn);
-
-            // Alineación horizontal con poca separación (8.f)
-            // Alineación horizontal con poca separación (8.f)
             modMenu->alignItemsHorizontallyWithPadding(8.f);
-
-            // POSICIÓN CORREGIDA:
-            // winSize.width / 2 + 135.f -> Los mueve a la izquierda (antes era +165.f)
-            // winSize.height / 2 - 80.f -> Los sube un poco (antes era -100.f)
             modMenu->setPosition({ winSize.width / 2 + 135.f, winSize.height / 2 - 90.f });
-
             m_mainLayer->addChild(modMenu, 10);
         }
 
@@ -3620,72 +3805,165 @@ protected:
 
         if (m_currentMode == Mode::View) {
             this->loadMessages();
-            // Mostrar botón de ban en modo View
+           
             if (m_banBtn) m_banBtn->setVisible(true);
         }
         else {
             m_activeColorTag = 0;
-            // Ocultar botón de ban en modo Write
+           
             if (m_banBtn) m_banBtn->setVisible(false);
         }
     }
 
-    void onClearText(CCObject*) { if (m_textInput) m_textInput->setString(""); }
-    void insertText(std::string text) { if (m_textInput) m_textInput->setString(m_textInput->getString() + text); }
+    void onClearText(CCObject*) {
+        if (m_textInput) m_textInput->setString("");    
+    }
+
+    void insertText(std::string text) {
+        if (m_textInput) m_textInput->setString(m_textInput->getString() + text);
+    }
+
     void onColorClicked(CCObject* sender) {
         int tagIdx = sender->getTag();
-        if (m_activeColorTag == tagIdx) { insertText("</c>"); m_activeColorTag = 0; }
+        if (m_activeColorTag == tagIdx) {
+            insertText("</c>");
+            m_activeColorTag = 0;
+        }
         else {
-            if (m_activeColorTag != 0) insertText("</c>");
+            if (m_activeColorTag != 0) {
+                insertText("</c>");
+            }
+
             std::string tag = "";
-            switch (tagIdx) { case 1: tag = "<cr>"; break; case 2: tag = "<co>"; break; case 3: tag = "<cy>"; break; case 4: tag = "<cg>"; break; case 5: tag = "<cb>"; break; case 6: tag = "<cp>"; break; }
-                                    insertText(tag); m_activeColorTag = tagIdx;
+            switch (tagIdx) {
+            case 1: tag = "<cr>"; break;
+            case 2: tag = "<co>"; break;
+            case 3: tag = "<cy>"; break;
+            case 4: tag = "<cg>"; break;
+            case 5: tag = "<cb>"; break;
+            case 6: tag = "<cp>"; break;
+            }
+
+            insertText(tag);
+            m_activeColorTag = tagIdx;
         }
     }
-    void onNewLine(CCObject*) { insertText("\\n"); }
+    void onNewLine(CCObject*) {
+        insertText("\\n");
+    }
+
     void onPreview(CCObject*) {
-        std::string text = m_textInput->getString(); if (text.empty()) text = " ";
-        std::string processed = text; size_t pos = 0; while ((pos = processed.find("\\n", pos)) != std::string::npos) { processed.replace(pos, 2, "\n"); pos += 1; }
+        std::string text = m_textInput->getString();
+        if (text.empty()) text = " ";
+        std::string processed = text;
+        size_t pos = 0;
+        while ((pos = processed.find("\\n", pos)) != std::string::npos) { processed.replace(pos, 2, "\n");
+        pos += 1; }
         FLAlertLayer::create("Preview", processed, "OK")->show();
     }
+
     void loadMessages() {
-        if (!m_loadingCircle) { m_loadingCircle = LoadingCircle::create(); m_loadingCircle->show(); m_mainLayer->addChild(m_loadingCircle, 99); }
-        auto req = web::WebRequest(); m_loadListener.setFilter(req.get("https://streak-servidor.onrender.com/messages"));
+        if (!m_loadingCircle) { m_loadingCircle = LoadingCircle::create();
+        m_loadingCircle->show(); m_mainLayer->addChild(m_loadingCircle, 99);
+
+      }
+        auto req = web::WebRequest();
+        m_loadListener.setFilter(req.get("https://streak-servidor.onrender.com/messages"));
     }
     void onLoadResponse(web::WebTask::Event* e) {
         if (!e->getValue() && !e->isCancelled()) return;
-        if (m_loadingCircle) { m_loadingCircle->fadeAndRemove(); m_loadingCircle = nullptr; }
+        if (m_loadingCircle) { m_loadingCircle->fadeAndRemove();
+        m_loadingCircle = nullptr;
+        }
         if (web::WebResponse* res = e->getValue()) {
-            if (res->ok() && res->json().isOk()) { auto data = res->json().unwrap(); if (data.isArray()) this->populateMessages(data.as<std::vector<matjson::Value>>().unwrap()); }
-            else { auto errLabel = CCLabelBMFont::create("Failed to load messages.", "goldFont.fnt"); errLabel->setScale(0.5f); errLabel->setPosition(m_scrollLayer->getContentSize() / 2); m_scrollLayer->m_contentLayer->addChild(errLabel); }
+            if (res->ok() && res->json().isOk()) {
+                auto data = res->json().unwrap();
+
+            if (data.isArray()) this->populateMessages(data.as<std::vector<matjson::Value>>().unwrap());
+            }
+            else { 
+                auto errLabel = CCLabelBMFont::create("Failed to load messages.", "goldFont.fnt");
+            errLabel->setScale(0.5f); errLabel->setPosition(m_scrollLayer->getContentSize() / 2);
+            m_scrollLayer->m_contentLayer->addChild(errLabel);
+            }
         }
     }
     void populateMessages(const std::vector<matjson::Value>& messages) {
-        m_scrollLayer->m_contentLayer->removeAllChildren(); float totalHeight = 20.f; std::vector<CCNode*> msgNodes;
+        m_scrollLayer->m_contentLayer->removeAllChildren();
+        float totalHeight = 20.f;
+        std::vector<CCNode*> msgNodes;
         for (const auto& msgData : messages) {
-            std::string username = msgData["username"].as<std::string>().unwrapOr("Unknown"); std::string content = msgData["content"].as<std::string>().unwrapOr("..."); int role = msgData["role"].as<int>().unwrapOr(0); long long timestamp = msgData["timestamp"].as<long long>().unwrapOr(0); if (timestamp > m_newestMessageTime) m_newestMessageTime = timestamp;
-            size_t pos = 0; while ((pos = content.find("\\n", pos)) != std::string::npos) { content.replace(pos, 2, "\n"); pos += 1; }
-            std::string roleTag = "", nameTag = "<cw>"; if (role == 2) { roleTag = "<cr>[ADMIN]</c> "; nameTag = "<cr>"; }
-            else if (role == 1) { roleTag = "<co>[MOD]</c> "; nameTag = "<co>"; }
-            auto textArea = TextArea::create(fmt::format("{0}{1}{2}</c>: {3}", roleTag, nameTag, username, content), "chatFont.fnt", 0.6f, 270.f, { 0, 1 }, 8.f, false); textArea->setColor({ 255, 255, 255 });
-            msgNodes.push_back(textArea); totalHeight += textArea->getContentSize().height + 25.f;
+            std::string username = msgData["username"].as<std::string>().unwrapOr("Unknown");
+            std::string content = msgData["content"].as<std::string>().unwrapOr("...");
+            int role = msgData["role"].as<int>().unwrapOr(0);
+            long long timestamp = msgData["timestamp"].as<long long>().unwrapOr(0);
+            if (timestamp > m_newestMessageTime) m_newestMessageTime = timestamp;
+            size_t pos = 0;
+            while ((pos = content.find("\\n", pos)) != std::string::npos) { content.replace(pos, 2, "\n");
+            pos += 1;
+            }
+
+            std::string roleTag = "", nameTag = "<cw>";
+            if (role == 2) { roleTag = "<cr>[ADMIN]</c> ";
+            nameTag = "<cr>";           
+            }
+
+            else if (role == 1) { roleTag = "<co>[MOD]</c> ";
+            nameTag = "<co>";
+            }
+            auto textArea = TextArea::create(fmt::format("{0}{1}{2}</c>: {3}", roleTag, nameTag, username, content), "chatFont.fnt", 0.6f, 270.f, { 0, 1 }, 8.f, false);
+            textArea->setColor({ 255, 255, 255 });
+            msgNodes.push_back(textArea);
+            totalHeight += textArea->getContentSize().height + 25.f;
         }
-        float scrollHeight = std::max(m_scrollLayer->getContentSize().height, totalHeight); m_scrollLayer->m_contentLayer->setContentSize({ 300.f, scrollHeight }); float currentY = scrollHeight - 15.f;
-        for (auto* node : msgNodes) { node->setAnchorPoint({ 0.f, 1.f }); node->setPosition({ 15.f, currentY }); m_scrollLayer->m_contentLayer->addChild(node); currentY -= (node->getContentSize().height + 25.f); }
+        float scrollHeight = std::max(m_scrollLayer->getContentSize().height, totalHeight);
+        m_scrollLayer->m_contentLayer->setContentSize({ 300.f, scrollHeight });
+        float currentY = scrollHeight - 15.f;
+        for (auto* node : msgNodes) { node->setAnchorPoint({ 0.f, 1.f });
+        node->setPosition({ 15.f, currentY });
+        m_scrollLayer->m_contentLayer->addChild(node);
+        currentY -= (node->getContentSize().height + 25.f);
+        }
+
         if (m_newestMessageTime > 0) Mod::get()->setSavedValue<double>("streak_last_chat_time", (double)m_newestMessageTime);
     }
     void onSend(CCObject*) {
         if (m_isSending) return;
-        if (g_streakData.userRole == 1 && g_streakData.dailyMsgCount >= 3) { FLAlertLayer::create("Limit Reached", "Daily limit reached (3/3).", "OK")->show(); return; }
-        std::string msg = m_textInput->getString(); if (msg.length() < 1) { FLAlertLayer::create("Error", "Message empty.", "OK")->show(); return; }
-        m_isSending = true; if (m_sendBtn) m_sendBtn->setEnabled(false);
-        auto am = GJAccountManager::sharedState(); matjson::Value payload = matjson::Value::object(); payload.set("accountID", am->m_accountID); payload.set("username", std::string(am->m_username)); payload.set("content", msg);
-        auto req = web::WebRequest(); m_sendListener.setFilter(req.bodyJSON(payload).post("https://streak-servidor.onrender.com/messages"));
+        if (g_streakData.userRole == 1 && g_streakData.dailyMsgCount >= 3) { FLAlertLayer::create("Limit Reached", "Daily limit reached (3/3).", "OK")->show();
+        return;
+        }
+        std::string msg = m_textInput->getString();
+        if (msg.length() < 1) { FLAlertLayer::create("Error", "Message empty.", "OK")->show();
+        return;
+        }
+        m_isSending = true;
+        if (m_sendBtn) m_sendBtn->setEnabled(false);
+        auto am = GJAccountManager::sharedState();
+        matjson::Value payload = matjson::Value::object();
+        payload.set("accountID", am->m_accountID); payload.set("username", std::string(am->m_username));
+        payload.set("content", msg);
+        auto req = web::WebRequest(); 
+        m_sendListener.setFilter(req.bodyJSON(payload).post("https://streak-servidor.onrender.com/messages"));
     }
     void onWebResponse(web::WebTask::Event* e) {
-        if (!e->getValue() && !e->isCancelled()) return; m_isSending = false; if (m_sendBtn) m_sendBtn->setEnabled(true);
-        if (web::WebResponse* res = e->getValue()) { if (res->ok()) { if (g_streakData.userRole == 1) { g_streakData.dailyMsgCount++; g_streakData.save(); } m_textInput->setString(""); this->onToggleMode(nullptr); } else { FLAlertLayer::create("Error", fmt::format("Failed: {}", res->code()), "OK")->show(); } }
-    }
+        if (!e->getValue() && !e->isCancelled()) return;
+        m_isSending = false;
+        if (m_sendBtn) m_sendBtn->setEnabled(true);
+        if (web::WebResponse* res = e->getValue()) {
+            if (res->ok()) { 
+                if (g_streakData.userRole == 1) {
+                    g_streakData.dailyMsgCount++;
+                    g_streakData.save();
+                } 
+                m_textInput->setString("");
+                this->onToggleMode(nullptr); 
+                 } 
+            else
+         { 
+        FLAlertLayer::create("Error", fmt::format("Failed: {}", res->code()), "OK")->show();
+           }
+        }
+     }
 
 public:
     static SendMessagePopup* create() {
@@ -3735,7 +4013,7 @@ protected:
     CCLabelBMFont* m_barText = nullptr;
     CCSprite* m_rachaIndicator = nullptr;
 
-    // NUEVO: Callback para crear el perfil manualmente
+  
     void onCreateProfile(CCObject*) {
         auto am = GJAccountManager::sharedState();
         if (!am || am->m_accountID == 0) {
@@ -3743,20 +4021,18 @@ protected:
             return;
         }
 
-        // --- FIX CRÍTICO: FORZAR LIMPIEZA ANTES DE CREAR ---
-        g_streakData.resetToDefault(); // <--- ESTO BORRA CUALQUIER DATO ANTIGUO EN MEMORIA
-        // ---------------------------------------------------
+        g_streakData.resetToDefault(); 
+      
 
         g_streakData.needsRegistration = false;
-        g_streakData.dailyUpdate();   // Inicia el día actual en 0
-        updatePlayerDataInFirebase(); // Guarda el perfil limpio en el servidor
+        g_streakData.dailyUpdate();  
+        updatePlayerDataInFirebase(); 
 
         this->onClose(nullptr);
         FLAlertLayer::create("Success", "Profile created! Please open the menu again.", "OK")->show();
     }
 
     bool setup() override {
-        // ESTADO 1: NO LOGUEADO EN GEOMETRY DASH
         auto am = GJAccountManager::sharedState();
         if (!am || am->m_accountID == 0) {
             this->setTitle("Error");
@@ -3771,7 +4047,7 @@ protected:
             return true;
         }
 
-        // ESTADO 2: NECESITA REGISTRO (BOTÓN "CREATE PROFILE")
+      
         if (g_streakData.needsRegistration) {
             this->setTitle("Welcome!");
             auto winSize = m_mainLayer->getContentSize();
@@ -3793,7 +4069,7 @@ protected:
             return true;
         }
 
-        // ESTADO 3: USUARIO NORMAL (TU CÓDIGO ORIGINAL)
+     
         this->setTitle("My Streak");
         auto winSize = m_mainLayer->getContentSize();
         float centerY = winSize.height / 2 + 25;
@@ -3943,18 +4219,41 @@ public:
     }
 
 protected:
-    // --- Callbacks ---
-    void onOpenHistory(CCObject*) { HistoryPopup::create()->show(); }
-    void onOpenStats(CCObject*) { DayProgressPopup::create()->show(); }
-    void onOpenRewards(CCObject*) { RewardsPopup::create()->show(); }
-    void onRachaClick(CCObject*) { AllRachasPopup::create()->show(); }
-    void onOpenMissions(CCObject*) { MissionsPopup::create()->show(); }
-    void onRedeemCode(CCObject*) { RedeemCodePopup::create()->show(); }
-    void onOpenLeaderboard(CCObject*) { LeaderboardPopup::create()->show(); }
-    void onOpenMessages(CCObject*) { SendMessagePopup::create()->show(); }
-    void onOpenDonations(CCObject*) { DonationPopup::create()->show(); }
-    void onOpenEvent(CCObject*) { EventPopup::create()->show(); } // Callback del nuevo botón
-    void onOpenLevelProgress(CCObject*) { LevelProgressPopup::create()->show(); }
+    
+    void onOpenHistory(CCObject*) {
+        HistoryPopup::create()->show(); 
+    }
+    void onOpenStats(CCObject*) {
+        DayProgressPopup::create()->show(); 
+    }
+    void onOpenRewards(CCObject*) {
+        RewardsPopup::create()->show();
+    }
+    void onRachaClick(CCObject*) { 
+        AllRachasPopup::create()->show();
+    }
+    void onOpenMissions(CCObject*) { 
+        MissionsPopup::create()->show();
+    }
+    void onRedeemCode(CCObject*) { 
+        RedeemCodePopup::create()->show(); 
+    }
+    void onOpenLeaderboard(CCObject*) {
+        LeaderboardPopup::create()->show(); 
+    }
+    void onOpenMessages(CCObject*) {
+        SendMessagePopup::create()->show();
+    }
+    void onOpenDonations(CCObject*) {
+        DonationPopup::create()->show();
+    }
+    void onOpenEvent(CCObject*) {
+        EventPopup::create()->show(); 
+    } 
+    void onOpenLevelProgress(CCObject*) {
+        LevelProgressPopup::create()->show();
+    }
+
 
     void onInfo(CCObject*) {
         std::string message =
@@ -3976,41 +4275,40 @@ protected:
         RoulettePopup::create()->show();
     }
 
-    // --- FUNCIONES DE ANIMACIÓN (Versión limpia sin partículas) ---
+   
 
     void showStreakAnimation(int streakLevel) {
         auto winSize = CCDirector::sharedDirector()->getWinSize();
 
-        // 1. Capa del Fondo (Solo se desvanece)
+      
         auto bgLayer = CCLayerColor::create({ 0, 0, 0, 0 });
         bgLayer->setTag(110);
-        this->addChild(bgLayer, 1000); // Z alto
+        this->addChild(bgLayer, 1000);
         bgLayer->runAction(CCFadeTo::create(0.5f, 200));
 
-        // 2. Capa de Contenido (Se encogerá al final)
         auto contentLayer = CCLayer::create();
         contentLayer->setTag(111);
         contentLayer->ignoreAnchorPointForPosition(false);
         contentLayer->setAnchorPoint({ 0.5f, 0.5f });
         contentLayer->setPosition(winSize / 2);
         contentLayer->setContentSize(winSize);
-        this->addChild(contentLayer, 1001); // Z más alto que el fondo
+        this->addChild(contentLayer, 1001);
 
-        // --- Sprite de la Racha ---
+       
         auto rachaSprite = CCSprite::create(g_streakData.getRachaSprite().c_str());
         if (rachaSprite) {
             rachaSprite->setPosition(winSize / 2);
             rachaSprite->setScale(0.0f);
             contentLayer->addChild(rachaSprite, 2);
 
-            // Entrada elástica
+
             rachaSprite->runAction(CCSequence::create(
                 CCDelayTime::create(0.3f),
                 CCEaseElasticOut::create(CCScaleTo::create(1.2f, 1.0f), 0.6f),
                 nullptr
             ));
 
-            // Flotación continua suave
+         
             rachaSprite->runAction(CCSequence::create(
                 CCDelayTime::create(1.5f),
                 CCRepeatForever::create(CCSequence::create(
@@ -4022,7 +4320,7 @@ protected:
             ));
         }
 
-        // --- Texto "Day X!" ---
+       
         auto daysLabel = CCLabelBMFont::create(fmt::format("Day {}!", streakLevel).c_str(), "goldFont.fnt");
         daysLabel->setPosition({ winSize.width / 2, winSize.height / 2 - 100.f });
         daysLabel->setScale(0.0f);
@@ -4034,17 +4332,17 @@ protected:
             nullptr
         ));
 
-        // --- Sonidos y Salida Programada ---
+       
         FMODAudioEngine::sharedEngine()->playEffect("achievement.mp3"_spr);
 
-        // Sonido extra a los 0.5s
+       
         contentLayer->runAction(CCSequence::create(
             CCDelayTime::create(0.5f),
             CCCallFunc::create(this, callfunc_selector(InfoPopup::playExtraStreakSound)),
             nullptr
         ));
 
-        // Salida a los 6.0s
+        
         contentLayer->runAction(CCSequence::create(
             CCDelayTime::create(6.0f),
             CCCallFunc::create(this, callfunc_selector(InfoPopup::onAnimationExit)),

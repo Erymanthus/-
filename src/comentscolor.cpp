@@ -23,7 +23,11 @@ class $modify(MyColoredCommentCell, CommentCell) {
         float r = (sin(m_fields->m_time * 0.7f) + 1.0f) / 2.0f;
         float g = (sin(m_fields->m_time * 0.7f + 2.0f * M_PI / 3.0f) + 1.0f) / 2.0f;
         float b = (sin(m_fields->m_time * 0.7f + 4.0f * M_PI / 3.0f) + 1.0f) / 2.0f;
-        ccColor3B color = { (GLubyte)(r * 255), (GLubyte)(g * 255), (GLubyte)(b * 255) };
+        ccColor3B color = {
+            (GLubyte)(r * 255),
+            (GLubyte)(g * 255),
+            (GLubyte)(b * 255)
+        };
 
         CCNode* textObject = nullptr;
 
@@ -38,10 +42,10 @@ class $modify(MyColoredCommentCell, CommentCell) {
         }
 
         if (textObject) {
-            if (auto label = dynamic_cast<CCLabelBMFont*>(textObject)) {
+            if (auto label = typeinfo_cast<CCLabelBMFont*>(textObject)) {
                 label->setColor(color);
             }
-            else if (auto textArea = dynamic_cast<TextArea*>(textObject)) {
+            else if (auto textArea = typeinfo_cast<TextArea*>(textObject)) {
                 textArea->setColor(color);
                 textArea->colorAllCharactersTo(color);
             }
@@ -76,17 +80,12 @@ class $modify(MyColoredCommentCell, CommentCell) {
             m_fields->m_mythicCheckListener.bind([this](web::WebTask::Event* e) {
                 if (web::WebResponse* res = e->getValue()) {
                     if (res->ok() && res->json().isOk()) {
-                        try {
-                            auto playerData = res->json().unwrap();
-                           
-                            bool hasMythic = playerData["has_mythic_color"].as<bool>().unwrapOr(false);
-                            if (hasMythic) {
-                               
-                                this->schedule(schedule_selector(MyColoredCommentCell::updateRainbowEffect));
-                            }
-                        }
-                        catch (const std::exception&) {
-                           
+                        auto playerData = res->json().unwrap();
+                        
+                        bool hasMythic = playerData["has_mythic_color"].as<bool>().unwrapOr(false);
+                        if (hasMythic) {
+                            
+                            this->schedule(schedule_selector(MyColoredCommentCell::updateRainbowEffect));
                         }
                     }
                 }

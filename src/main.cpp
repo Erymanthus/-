@@ -1,7 +1,6 @@
 ﻿#include "StreakData.h"
 #include "Popups.h"
 #include "FirebaseManager.h"
-
 #include <Geode/modify/MenuLayer.hpp>
 #include <Geode/modify/CommentCell.hpp>
 #include <Geode/modify/PlayLayer.hpp>
@@ -27,14 +26,9 @@ class $modify(MyPlayLayer, PlayLayer) {
         
         PlayLayer::levelComplete();     
         int percentAfter = this->m_level->m_normalPercent;
-
-        
+  
         if (this->m_isPracticeMode) return;
-
-        
-        if (percentBefore >= 100) return;
-
-        
+        if (percentBefore >= 100) return;       
         if (percentAfter < 100) {
             log::warn("⚠️ Anti-Cheat: levelComplete se ejecutó pero el porcentaje final es solo {}%", percentAfter);
             return;
@@ -43,7 +37,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         
 
         int stars = this->m_level->m_stars;
-        // Solo niveles con estrellas (rated) dan puntos
+       
         if (stars > 0) {
             int points = 0;
             if (stars <= 3) points = 1;       // Auto/Easy/Normal
@@ -56,10 +50,10 @@ class $modify(MyPlayLayer, PlayLayer) {
                 int before = g_streakData.streakPointsToday;
                 int required = g_streakData.getRequiredPoints();
 
-                log::info("✅ Nivel completado legalmente ({} stars -> {} points)", stars, points);
+                log::info("✅ Legally completed level ({} stars -> {} points)", stars, points);
                 g_streakData.addPoints(points);
 
-                // Mostrar barra de progreso
+               
                 if (auto scene = CCDirector::sharedDirector()->getRunningScene()) {
                     scene->addChild(StreakProgressBar::create(points, before, required), 100);
                 }
@@ -79,7 +73,7 @@ class $modify(MyMenuLayer, MenuLayer) {
     bool init() {
         if (!MenuLayer::init()) return false;
 
-        // ESTADO INICIAL: Cargando
+       
         this->createStreakButton(ButtonState::Loading);
         this->loadPlayerData();
 
@@ -94,7 +88,7 @@ class $modify(MyMenuLayer, MenuLayer) {
             return;
         }
 
-        // Si sigue sin cargar, volvemos a intentar y mostramos estado de carga
+        
         this->createStreakButton(ButtonState::Loading);
         this->loadPlayerData();
     }
@@ -153,11 +147,10 @@ class $modify(MyMenuLayer, MenuLayer) {
     }
 
     void onLoadFailed() {
-        // MARCAR COMO NO CARGADO ES CRÍTICO
         g_streakData.isDataLoaded = false;
         g_streakData.m_initialized = false;
 
-        // MOSTRAR ERROR VISUALMENTE
+       
         this->createStreakButton(ButtonState::Error);
 
         if (!m_fields->m_isReconnecting) {
@@ -231,7 +224,8 @@ class $modify(MyMenuLayer, MenuLayer) {
         if (g_streakData.isBanned) {
             createQuickPopup("ACCOUNT BANNED", "You have been <cr>BANNED</c> from Streak Mod.\nReason: <cy>" + g_streakData.banReason + "</c>", "OK", "Discord", [](FLAlertLayer*, bool btn2) {
                 if (btn2) cocos2d::CCApplication::sharedApplication()->openURL("https://discord.gg/vEPWBuFEn5");
-                });
+                }
+            );
             return;
         }
         FLAlertLayer::create("Connection Failed", "<cr>Internet connection required.</c>\nRetrying in background...", "OK")->show();
@@ -258,7 +252,7 @@ class $modify(MyCommentCell, CommentCell) {
     };
 
     void onBadgeInfoClick(CCObject * sender) {
-        if (auto badgeID = static_cast<CCString*>(static_cast<CCNode*>(sender)->getUserObject())) {
+        if (auto badgeID = static_cast<CCString*>(static_cast<CCNode*>(sender)->getUserObject("badge"_spr))) {
             if (auto badgeInfo = g_streakData.getBadgeInfo(badgeID->getCString())) {
                 std::string title = badgeInfo->displayName;
                 std::string category = g_streakData.getCategoryName(badgeInfo->category);
@@ -284,7 +278,7 @@ class $modify(MyCommentCell, CommentCell) {
                         auto badgeButton = CCMenuItemSpriteExtra::create(
                             badgeSprite, this, menu_selector(MyCommentCell::onBadgeInfoClick)
                         );
-                        badgeButton->setUserObject(CCString::create(equippedBadge->badgeID));
+                        badgeButton->setUserObject("badge"_spr, CCString::create(equippedBadge->badgeID));
                         badgeButton->setID("streak-badge"_spr);
                         username_menu->addChild(badgeButton);
                         username_menu->updateLayout();
@@ -297,9 +291,9 @@ class $modify(MyCommentCell, CommentCell) {
             m_fields->m_badgeListener.bind([this, p0](web::WebTask::Event* e) {
                 if (web::WebResponse* res = e->getValue()) {
                     if (res->ok() && res->json().isOk()) {
-                        try {
-                            auto playerData = res->json().unwrap();
-                            std::string badgeId = playerData["equipped_badge_id"].as<std::string>().unwrap();
+                        auto playerData = res->json().unwrap();
+                        if (auto badgeIdResult = playerData["equipped_badge_id"].as<std::string>()) {
+                            std::string badgeId = badgeIdResult.unwrap();
                             if (!badgeId.empty()) {
                                 auto badgeInfo = g_streakData.getBadgeInfo(badgeId);
                                 if (badgeInfo) {
@@ -309,15 +303,15 @@ class $modify(MyCommentCell, CommentCell) {
                                         auto badgeButton = CCMenuItemSpriteExtra::create(
                                             badgeSprite, this, menu_selector(MyCommentCell::onBadgeInfoClick)
                                         );
-                                        badgeButton->setUserObject(CCString::create(badgeInfo->badgeID));
+                                        badgeButton->setUserObject("badge"_spr, CCString::create(badgeInfo->badgeID));
                                         username_menu->addChild(badgeButton);
                                         username_menu->updateLayout();
                                     }
                                 }
                             }
                         }
-                        catch (const std::exception& ex) {
-                            log::debug("Player {} (commenter) has no badge: {}", p0->m_accountID, ex.what());
+                        else {
+                            log::debug("Player {} (commenter) has no badge: {}", p0->m_accountID, badgeIdResult.unwrapErr());
                         }
                     }
                 }
@@ -362,7 +356,10 @@ class $modify(MyPauseLayer, PauseLayer) {
             pointCounterNode->setContentSize({ pointLabel->getScaledContentSize().width + pointIcon->getScaledContentSize().width + 5, pointLabel->getScaledContentSize().height });
             pointLabel->setPosition({ -pointIcon->getScaledContentSize().width / 2, 0 });
             pointIcon->setPosition({ pointLabel->getScaledContentSize().width / 2 + 5, 0 });
-            streakNode->setPosition({ winSize.width * static_cast<float>(posX), winSize.height * static_cast<float>(posY) });
+            streakNode->setPosition({
+                winSize.width * static_cast<float>(posX), winSize.height * static_cast<float>(posY)
+                }
+            );
             this->addChild(streakNode);
         }
     }

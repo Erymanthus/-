@@ -2,7 +2,7 @@
 #include <Geode/modify/GameManager.hpp>
 #include <Geode/binding/GJAccountManager.hpp>
 #include "StreakData.h"
-#include "FirebaseManager.h" // <-- ESTO LE DICE DONDE ENCONTRAR LA FUNCIÓN
+#include "FirebaseManager.h" 
 
 using namespace geode::prelude;
 
@@ -16,19 +16,16 @@ class $modify(AccountWatcher, GameManager) {
         if (!am) return;
 
         int currentID = am->m_accountID;
-
-        // 1. Inicialización
+       
         if (g_lastAccountID == -1) {
             g_lastAccountID = currentID;
-            // Si arranca ya logueado, intentamos cargar
             if (currentID != 0 && !g_streakData.isInitialized()) {
                 g_streakData.isDataLoaded = false;
-                loadPlayerDataFromServer(); // <-- Ahora sí debería encontrarla
+                loadPlayerDataFromServer();
             }
             return;
         }
-
-        // 2. Detección de cambio
+       
         if (currentID != g_lastAccountID) {
             log::info("Cambio de cuenta detectado ({} -> {})", g_lastAccountID, currentID);
 
@@ -41,7 +38,7 @@ class $modify(AccountWatcher, GameManager) {
                 log::info("Inicio de sesión (ID: {}). Cargando datos...", currentID);
                 g_streakData.resetToDefault();
                 g_streakData.isDataLoaded = false;
-                loadPlayerDataFromServer(); // <-- Y aquí también
+                loadPlayerDataFromServer(); 
             }
 
             g_lastAccountID = currentID;
