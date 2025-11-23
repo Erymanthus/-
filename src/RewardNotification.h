@@ -1,6 +1,6 @@
 #pragma once
 #include <cocos2d.h>
-#include <geode/Geode.hpp>
+#include <Geode/Geode.hpp>
 #include <random>
 #include <vector>
 #include <algorithm>

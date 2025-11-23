@@ -3,8 +3,8 @@
 #include "../FirebaseManager.h"
 #include <Geode/ui/Popup.hpp>
 #include <Geode/utils/cocos.hpp>
-#include "BadgeNotification.h"
-#include "RewardNotification.h"
+#include "../BadgeNotification.h"
+#include "../RewardNotification.h"
 #include "SharedVisuals.h" 
 
 using namespace geode::prelude;
