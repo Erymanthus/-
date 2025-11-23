@@ -6,7 +6,7 @@
 #include <Geode/binding/LevelInfoLayer.hpp>
 #include <Geode/binding/TextAlertPopup.hpp> 
 #include <Geode/ui/Notification.hpp> 
-#include <geode/utils/cocos.hpp> 
+#include <Geode/utils/cocos.hpp>
 #include "../BadgeNotification.h"
 #include "../RewardNotification.h"
 

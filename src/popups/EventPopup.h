@@ -171,7 +171,7 @@ protected:
         auto rewardsMap = m_eventRewards.as<std::map<std::string, matjson::Value>>().unwrap();
         for (const auto& pair : rewardsMap) sortedRewards.push_back(pair);
         std::sort(sortedRewards.begin(), sortedRewards.end(), [](const auto& a, const auto& b) {
-            return a.second["day"].as<int>().unwrapOr(999) < b.second["day"].as<int>().unwrapOr(999);
+            return a.second["day"].template as<int>().unwrapOr(999) < b.second["day"].template as<int>().unwrapOr(999);
             }
         );
 
