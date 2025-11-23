@@ -1,5 +1,5 @@
 {
-	"geode": "4.9.0",
+	"geode": "4.10.0",
 	"gd": {
 		"win": "2.2074",
 		"android": "2.2074",
@@ -8,7 +8,7 @@
 	},
 	"id": "jotabelike.gd_racha",
 	"name": "Streak!",
-	"version": "v1.9.7-beta",
+	"version": "v1.10.1",
 	"developer": "XJotabelikeX",
 	"description": "Personal Streak! Prove you're the best and start a streak!",
 	"links": {
@@ -17,14 +17,14 @@
 	
 	},
 	"tags": [
-		"offline"
+		"online"
 		
 	],
 	"dependencies": [
 		
 		{
 			"id": "jouca.badgesapi",
-			"version": ">=v1.3.0",
+			"version": ">=v1.3.1",
 			"importance": "required"
 		},
 		{

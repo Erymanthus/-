@@ -1,5 +1,4 @@
 #pragma once
-
 #include <Geode/Geode.hpp>
 #include <ctime>
 #include <string>
@@ -9,47 +8,35 @@
 #include <iomanip>
 #include <sstream>
 
-
 using namespace geode::prelude;
 
 struct StreakData {
-    
-    int currentStreak;
-    int streakPointsToday;
-    int totalStreakPoints;
-    bool hasNewStreak;
-    std::string lastDay;
-    std::string equippedBadge;
-    int superStars;
-    int lastRouletteIndex;
-    int totalSpins;
-    bool needsRegistration = false;
-    int lastStreakAnimated = 0;
-    bool isBanned = false;            
-    std::string banReason = "";       
-    int starTickets;
-    std::vector<int> streakCompletedLevels;
-    std::map<std::string, int> streakPointsHistory;
-    bool pointMission1Claimed;
-    bool pointMission2Claimed;
-    bool pointMission3Claimed;
-    bool pointMission4Claimed;
-    bool pointMission5Claimed;
-    bool pointMission6Claimed;
-    bool isDataLoaded;
-    bool m_initialized = false;
-    int userRole = 0;          
-    int dailyMsgCount = 0;    
-
-    
-    std::set<int> completedLevelMissions;
-
+  
     enum class BadgeCategory {
         COMMON,
         SPECIAL,
         EPIC,
         LEGENDARY,
         MYTHIC
+    };
+
+   
+    
+    struct MailMessage {
+        std::string id;
+        std::string title;
+        std::string body;
+        std::string type;
+        long long timestamp;
+        int rewardStars = 0;
+        int rewardTickets = 0;
+        std::string rewardBadge = "";
+
+        bool isClaimedLocal = false;
+
+        bool hasRewards() const {
+            return rewardStars > 0 || rewardTickets > 0 || !rewardBadge.empty();
+        }
     };
 
     struct BadgeInfo {
@@ -61,8 +48,43 @@ struct StreakData {
         bool isFromRoulette;
     };
 
-    
+   
+
+    int currentStreak;
+    int streakPointsToday;
+    int totalStreakPoints;
+    bool hasNewStreak;
+    std::string lastDay;
+    std::string equippedBadge;
+    int superStars;
+    int lastRouletteIndex;
+    int totalSpins;
+    bool needsRegistration = false;
+    int lastStreakAnimated = 0;
+    bool isBanned = false;
+    std::string banReason = "";
+    int starTickets;
+    std::string streakID = "";
+    std::vector<int> streakCompletedLevels;
+    std::map<std::string, int> streakPointsHistory;
+    bool pointMission1Claimed;
+    bool pointMission2Claimed;
+    bool pointMission3Claimed;
+    bool pointMission4Claimed;
+    bool pointMission5Claimed;
+    bool pointMission6Claimed;
+    bool isDataLoaded;
+    bool m_initialized = false;
+    int userRole = 0;
+    int dailyMsgCount = 0;
+    int globalRank = 0;
+
+  
+    std::vector<MailMessage> inbox;
+    std::set<int> completedLevelMissions;
     std::vector<BadgeInfo> badges = {
+
+        //days
         {5, "reward5.png"_spr, "First Steps", BadgeCategory::COMMON, "badge_5", false},
         {10, "reward10.png"_spr, "Shall We Continue?", BadgeCategory::COMMON, "badge_10", false},
         {30, "reward30.png"_spr, "We're Going Well", BadgeCategory::SPECIAL, "badge_30", false},
@@ -72,7 +94,8 @@ struct StreakData {
         {150, "reward150.png"_spr, "150 Days!!!", BadgeCategory::LEGENDARY, "badge_150", false},
         {300, "reward300.png"_spr, "300 Days!!!", BadgeCategory::LEGENDARY, "badge_300", false},
         {365, "reward1year.png"_spr, "1 Year!!!", BadgeCategory::MYTHIC, "badge_365", false},
-       
+
+		//more badges
         {0, "badge_beta.png"_spr, "Player beta?", BadgeCategory::COMMON, "beta_badge", true},
         {0, "badge_platino.png"_spr, "platino badge", BadgeCategory::COMMON, "platino_streak_badge", true},
         {0, "badge_diamante_gd.png"_spr, "GD Diamond!", BadgeCategory::COMMON, "diamante_gd_badge", true},
@@ -86,45 +109,59 @@ struct StreakData {
         {0, "gd_badge.png"_spr, "GD!", BadgeCategory::COMMON, "gd_badge", true },
         {0, "adrian_badge.png"_spr, "juegajuegos", BadgeCategory::COMMON, "adrian_badge", true },
 
-        {0, "shiver_badge.png"_spr, "Shiver!", BadgeCategory::SPECIAL, "shiver_badge", true }, 
-        {0, "dual_badge.png"_spr, "Dual Master", BadgeCategory::LEGENDARY, "dual_badge", true }, 
-        {0, "ttv_badge.png"_spr, "The Towerverse?", BadgeCategory::LEGENDARY, "ttv_badge", true }, 
-        {0, "cos_badge.png"_spr, "Change of Scene", BadgeCategory::SPECIAL, "cos_badge", true }, 
+        //misiones
+        {0, "shiver_badge.png"_spr, "Shiver!", BadgeCategory::SPECIAL, "shiver_badge", true },
+        {0, "dual_badge.png"_spr, "Dual Master", BadgeCategory::LEGENDARY, "dual_badge", true },
+        {0, "ttv_badge.png"_spr, "The Towerverse?", BadgeCategory::LEGENDARY, "ttv_badge", true },
+        {0, "cos_badge.png"_spr, "Change of Scene", BadgeCategory::SPECIAL, "cos_badge", true },
         {0, "b_badge.png"_spr, "B", BadgeCategory::SPECIAL, "b_badge", true },
-        {0, "spy_badge.png"_spr, "iSpy What?", BadgeCategory::EPIC, "spy_badge", true }, 
-
+        {0, "spy_badge.png"_spr, "iSpy What?", BadgeCategory::EPIC, "spy_badge", true },
         {0, "tsukasa_badge.png"_spr, "Tsukasitaaa", BadgeCategory::EPIC, "tsukasa_badge", true },
         {0, "funhouse_badge.png"_spr, "you again?", BadgeCategory::LEGENDARY, "funhouse_badge", true },
-		{0, "cobre_badge.png"_spr, "idk", BadgeCategory::SPECIAL, "cobre_badge", true },
+        {0, "cobre_badge.png"_spr, "idk", BadgeCategory::SPECIAL, "cobre_badge", true },
         {0, "miku_badge.png"_spr, "Miku Miku oooeeooo", BadgeCategory::EPIC, "miku_badge", true },
         {0, "nantendo_badge.png"_spr, "Nintendo bruh", BadgeCategory::COMMON, "nantendo_badge", true },
 
-		{0, "Frostbite_badge.png"_spr, "By La Fluffaroni", BadgeCategory::SPECIAL, "Frostbite_badge", true },
-		{0, "Skybound_badge.png"_spr, "By La Fluffaroni", BadgeCategory::EPIC, "Skybound_badge", true },
-		{0, "Steampunk_Dash_badge.png"_spr, "By La Fluffaroni", BadgeCategory::COMMON, "Steampunk_Dash_badge", true },
-		{0, "money_badge.png"_spr, "By La Fluffaroni", BadgeCategory::SPECIAL, "money_badge", true },
-		{0, "Skeletal_Shenanigans_badge.png"_spr, "By Fluffaroni", BadgeCategory::LEGENDARY, "Skeletal_Shenanigans_badge",true},
-        {0, "moderator_badge.png"_spr, "Moderator", BadgeCategory::LEGENDARY, "moderator_badge",true}
+        // shop
+        {0, "Frostbite_badge.png"_spr, "By La Fluffaroni", BadgeCategory::SPECIAL, "Frostbite_badge", true },
+        {0, "Skybound_badge.png"_spr, "By La Fluffaroni", BadgeCategory::EPIC, "Skybound_badge", true },
+        {0, "Steampunk_Dash_badge.png"_spr, "By La Fluffaroni", BadgeCategory::COMMON, "Steampunk_Dash_badge", true },
+        {0, "money_badge.png"_spr, "By La Fluffaroni", BadgeCategory::SPECIAL, "money_badge", true },
+        {0, "Skeletal_Shenanigans_badge.png"_spr, "By Fluffaroni", BadgeCategory::LEGENDARY, "Skeletal_Shenanigans_badge",true}, 
+        {0, "event_badge1.png"_spr, "Event", BadgeCategory::MYTHIC, "winter_badge",true},
+		{0, "random_badge.png"_spr, "GD Randomizer", BadgeCategory::SPECIAL, "random_badge",true},
+		{0, "mai_badge.png"_spr, "Mai Waifu", BadgeCategory::EPIC, "mai_badge",true},
 
+		//moderator
+        {0, "moderator_badge.png"_spr, "Moderator", BadgeCategory::LEGENDARY, "moderator_badge",true},
 
-
+		//black hole
+        {0, "bh_badge_1.png"_spr, "Black hole Red", BadgeCategory::EPIC, "bh_badge_1",true},
+		{0, "bh_badge_2.png"_spr, "Black hole Sky blue", BadgeCategory::SPECIAL, "bh_badge_2",true},
+		{0, "bh_badge_3.png"_spr, "Black hole purple", BadgeCategory::SPECIAL, "bh_badge_3",true },
+		{0, "bh_badge_4.png"_spr, "Black hole Blue", BadgeCategory::COMMON, "bh_badge_4",true},
+		{0, "bh_badge_5.png"_spr, "Black hole Orange", BadgeCategory::LEGENDARY, "bh_badge_5",true},
+		{0, "bh_badge_6.png"_spr, "Black hole Green", BadgeCategory::COMMON, "bh_badge_6",true },
+		{0, "bh_badge_7.png"_spr, "Black hole Ultra", BadgeCategory::MYTHIC, "bh_badge_7",true},
+		//minecraft
+		{0, "mc_badge_1.png"_spr, "PVP Master", BadgeCategory::LEGENDARY, "mc_badge_1", true},
+        {0, "mc_badge_2.png"_spr, "full farming", BadgeCategory::EPIC, "mc_badge_2", true},
+		{0, "mc_badge_3.png"_spr, "break shields", BadgeCategory::COMMON, "mc_badge_3", true}
 
     };
 
     std::vector<bool> unlockedBadges;
-
     bool isInitialized() const {
         return m_initialized && isDataLoaded;
     }
 
-   
     void parseServerResponse(const matjson::Value& data);
     void resetToDefault();
     void load();
     void save();
     int getRequiredPoints();
     int getTicketValueForRarity(BadgeCategory category);
-    void unlockBadge(const std::string& badgeID); 
+    void unlockBadge(const std::string& badgeID);
     std::string getCurrentDate();
     void unequipBadge();
     bool isBadgeEquipped(const std::string& badgeID);
@@ -140,10 +177,7 @@ struct StreakData {
     bool isBadgeUnlocked(const std::string& badgeID);
     void equipBadge(const std::string& badgeID);
     BadgeInfo* getEquippedBadge();
-
-   
     bool isLevelMissionClaimed(int levelID) const;
 };
-
 
 extern StreakData g_streakData;

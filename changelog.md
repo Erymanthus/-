@@ -1,3 +1,12 @@
+# 1.10.1 
+- New style for roulette
+- New badges
+- Improved notifications
+- Event!
+- improved level challenge interface
+- improved store interface
+- Some textures were updated!
+
 # 1.9.7
 - Fix bugs
 

@@ -30,7 +30,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         if (this->m_isPracticeMode) return;
         if (percentBefore >= 100) return;       
         if (percentAfter < 100) {
-            log::warn("⚠️ Anti-Cheat: levelComplete se ejecutó pero el porcentaje final es solo {}%", percentAfter);
+            log::warn("Anti-Cheat: Level completed, but the final percentage is only {}%", percentAfter);
             return;
         }
 
@@ -40,17 +40,17 @@ class $modify(MyPlayLayer, PlayLayer) {
        
         if (stars > 0) {
             int points = 0;
-            if (stars <= 3) points = 1;       // Auto/Easy/Normal
-            else if (stars <= 5) points = 3;  // Hard
-            else if (stars <= 7) points = 4;  // Harder
-            else if (stars <= 9) points = 5;  // Insane
-            else points = 6;                  // Demon
+            if (stars <= 3) points = 1;       // auto -easy - normal
+            else if (stars <= 5) points = 3;  // hard
+            else if (stars <= 7) points = 4;  // harder
+            else if (stars <= 9) points = 5;  // insane
+            else points = 6;                  // demon
 
             if (points > 0) {
                 int before = g_streakData.streakPointsToday;
                 int required = g_streakData.getRequiredPoints();
 
-                log::info("✅ Legally completed level ({} stars -> {} points)", stars, points);
+                log::info("Legally completed level ({} stars -> {} points)", stars, points);
                 g_streakData.addPoints(points);
 
                
@@ -69,7 +69,6 @@ class $modify(MyMenuLayer, MenuLayer) {
     };
 
     enum class ButtonState { Loading, Active, Error };
-
     bool init() {
         if (!MenuLayer::init()) return false;
 
@@ -171,9 +170,11 @@ class $modify(MyMenuLayer, MenuLayer) {
         case ButtonState::Loading:
             icon = CCSprite::createWithSpriteFrameName("GJ_updateBtn_001.png");
             break;
+
         case ButtonState::Error:
             icon = CCSprite::createWithSpriteFrameName("exMark_001.png");
             break;
+
         case ButtonState::Active:
             std::string spriteName = g_streakData.getRachaSprite();
             if (!spriteName.empty()) icon = CCSprite::create(spriteName.c_str());
@@ -339,6 +340,8 @@ class $modify(MyPauseLayer, PauseLayer) {
             auto daysLabel = CCLabelBMFont::create(
                 CCString::createWithFormat("Day %d", streakDays)->getCString(), "goldFont.fnt"
             );
+
+
             daysLabel->setScale(0.35f);
             daysLabel->setPosition({ 0, -22 });
             streakNode->addChild(daysLabel);
@@ -348,12 +351,19 @@ class $modify(MyPauseLayer, PauseLayer) {
             auto pointLabel = CCLabelBMFont::create(
                 CCString::createWithFormat("%d / %d", pointsToday, requiredPoints)->getCString(), "bigFont.fnt"
             );
+
+
             pointLabel->setScale(0.35f);
             pointCounterNode->addChild(pointLabel);
             auto pointIcon = CCSprite::create("streak_point.png"_spr);
             pointIcon->setScale(0.18f);
             pointCounterNode->addChild(pointIcon);
-            pointCounterNode->setContentSize({ pointLabel->getScaledContentSize().width + pointIcon->getScaledContentSize().width + 5, pointLabel->getScaledContentSize().height });
+
+            pointCounterNode->setContentSize({
+                pointLabel->getScaledContentSize().width + pointIcon->getScaledContentSize().width + 5, pointLabel->getScaledContentSize().height 
+                }
+            );
+
             pointLabel->setPosition({ -pointIcon->getScaledContentSize().width / 2, 0 });
             pointIcon->setPosition({ pointLabel->getScaledContentSize().width / 2 + 5, 0 });
             streakNode->setPosition({

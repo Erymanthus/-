@@ -20,6 +20,8 @@ void StreakData::resetToDefault() {
     lastDay = "";
     equippedBadge = "";
     superStars = 0;
+    globalRank = 0;
+    streakID = "";
     lastStreakAnimated = 0;
     needsRegistration = false;
     isBanned = false;
@@ -76,6 +78,14 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
     totalSpins = data["total_spins"].as<int>().unwrapOr(0);
     lastDay = data["last_day"].as<std::string>().unwrapOr("");
     streakPointsToday = data["streakPointsToday"].as<int>().unwrapOr(0);
+    streakID = data["streakID"].as<std::string>().unwrapOr("Pending...");
+
+    if (data.contains("rank")) {
+        globalRank = data["rank"].as<int>().unwrapOr(0);
+    }
+    else if (data.contains("global_rank")) {
+        globalRank = data["global_rank"].as<int>().unwrapOr(0);
+    }
 
     userRole = 0;
     if (data.contains("role")) {
@@ -120,7 +130,6 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
             log::warn("Could not parse 'unlocked_badges' as array.");
         }
     }
-
    
     pointMission1Claimed = false;
     pointMission2Claimed = false;

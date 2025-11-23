@@ -23,6 +23,7 @@ class $modify(MyColoredCommentCell, CommentCell) {
         float r = (sin(m_fields->m_time * 0.7f) + 1.0f) / 2.0f;
         float g = (sin(m_fields->m_time * 0.7f + 2.0f * M_PI / 3.0f) + 1.0f) / 2.0f;
         float b = (sin(m_fields->m_time * 0.7f + 4.0f * M_PI / 3.0f) + 1.0f) / 2.0f;
+
         ccColor3B color = {
             (GLubyte)(r * 255),
             (GLubyte)(g * 255),

@@ -27,15 +27,15 @@ class $modify(AccountWatcher, GameManager) {
         }
        
         if (currentID != g_lastAccountID) {
-            log::info("Cambio de cuenta detectado ({} -> {})", g_lastAccountID, currentID);
+            log::info("Account change detected ({} -> {})", g_lastAccountID, currentID);
 
             if (currentID == 0) {
-                log::info("Cierre de sesión. Reseteando datos.");
+                log::info("Logging out. Resetting data.");
                 g_streakData.resetToDefault();
                 g_streakData.isDataLoaded = true;
             }
             else {
-                log::info("Inicio de sesión (ID: {}). Cargando datos...", currentID);
+                log::info("Login (ID: {}). Loading data...", currentID);
                 g_streakData.resetToDefault();
                 g_streakData.isDataLoaded = false;
                 loadPlayerDataFromServer(); 
