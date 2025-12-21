@@ -2,105 +2,669 @@
 #include "StreakCommon.h"
 #include "../StreakData.h"
 #include <Geode/ui/Popup.hpp>
+#include <Geode/ui/ScrollLayer.hpp> 
 #include <Geode/utils/web.hpp>
 #include "../BadgeNotification.h"
 #include "../RewardNotification.h"
 #include "SharedVisuals.h" 
+#include "StatusSpinner.h"
+#include <Geode/ui/Notification.hpp>
 
+using namespace geode::prelude;
+
+class RewardListPopup : public Popup<const std::map<std::string,
+    matjson::Value>&,
+    const std::map<std::string,
+    int>&> {
+
+protected:
+    bool setup(const std::map<std::string,
+        matjson::Value>& rewards,
+        const std::map<std::string,
+        int>& weights) override {
+        this->setTitle("Possible Awards");
+
+        auto popupSize = m_mainLayer->getContentSize();
+        auto listSize = CCSize{ 360.f, 210.f };
+
+        auto listBg = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
+        listBg->setContentSize(listSize + CCSize{ 10.f, 10.f });
+        listBg->setColor({ 0, 0, 0 });
+        listBg->setOpacity(100);
+        listBg->setPosition(popupSize / 2 - CCPoint{ 0.f, 15.f });
+        m_mainLayer->addChild(listBg);
+
+        double totalWeight = 0;
+        int defaultWeight = weights.count("Common") ? weights.at("Common") : 100;
+
+        for (auto const& [key, val] : rewards) {
+            std::string rarity = val["rarity"].as<std::string>().unwrapOr("Common");
+            int w = weights.count(rarity) ? weights.at(rarity) : defaultWeight;
+            totalWeight += w;
+        }
+        if (totalWeight <= 0) {
+            totalWeight = 1;
+        }
+
+        auto scroll = ScrollLayer::create(listSize);
+        scroll->setPosition(
+            (popupSize.width - listSize.width) / 2,
+            (popupSize.height - listSize.height) / 2 - 15.f
+        );
+
+        float itemHeight = 60.f;
+        float totalHeight = std::max(listSize.height, rewards.size() * itemHeight);
+
+        scroll->m_contentLayer->setContentSize({ listSize.width, totalHeight });
+
+        int index = 0;
+        std::vector<std::pair<std::string, matjson::Value>> sortedRewards(rewards.begin(), rewards.end());
+
+        for (const auto& [key, data] : sortedRewards) {
+            float yPos = totalHeight - (index * itemHeight) - (itemHeight / 2);
+            int opacity = (index % 2 == 0) ? 100 : 50;
+
+            auto bg = CCLayerColor::create(
+                { 0, 0, 0, (GLubyte)opacity },
+                listSize.width,
+                itemHeight
+            );
+            bg->setPosition({ 0.f, yPos - (itemHeight / 2) });
+            scroll->m_contentLayer->addChild(bg);
+
+            std::string rarity = data["rarity"].as<std::string>().unwrapOr("Common");
+            int amount = 0;
+            CCSprite* icon = nullptr;
+            std::string name = "";
+            bool owned = false;
+            bool isConsumable = false;
+
+            if (data.contains("badge")) {
+                std::string bID = data["badge"].as<std::string>().unwrapOr("");
+                if (auto binfo = g_streakData.getBadgeInfo(bID)) {
+                    icon = CCSprite::create(binfo->spriteName.c_str());
+                    name = "Badge";
+                    if (g_streakData.isBadgeUnlocked(bID)) {
+                        owned = true;
+                    }
+                }
+            }
+            else if (data.contains("banner")) {
+                std::string bID = data["banner"].as<std::string>().unwrapOr("");
+                if (auto binfo = g_streakData.getBannerInfo(bID)) {
+                    icon = CCSprite::create(binfo->spriteName.c_str());
+                    name = "Banner";
+                    if (g_streakData.isBannerUnlocked(bID)) {
+                        owned = true;
+                    }
+                }
+            }
+            else if (data.contains("super_stars")) {
+                amount = data["super_stars"].as<int>().unwrapOr(0);
+                icon = CCSprite::create("super_star.png"_spr);
+                name = "Super Stars";
+                isConsumable = true;
+            }
+            else if (data.contains("star_tickets")) {
+                amount = data["star_tickets"].as<int>().unwrapOr(0);
+                icon = CCSprite::create("star_tiket.png"_spr);
+                name = "Tickets";
+                isConsumable = true;
+            }
+
+            if (!icon) {
+                icon = CCSprite::createWithSpriteFrameName("GJ_questionMark_001.png");
+            }
+
+            float scale;
+            if (isConsumable) {
+                scale = 0.5f;
+                if (icon->getContentSize().width > 80.f) {
+                    scale = 0.25f;
+                }
+            }
+            else {
+                scale = 0.75f;
+                if (icon->getContentSize().width > 80.f) {
+                    scale = 0.45f;
+                }
+            }
+
+            icon->setScale(scale);
+            icon->setPosition({ 40.f, yPos });
+            scroll->m_contentLayer->addChild(icon);
+
+            if (owned) {
+                auto check = CCSprite::createWithSpriteFrameName("GJ_completesIcon_001.png");
+                check->setScale(0.9f);
+                check->setPosition({ 40.f, yPos });
+                scroll->m_contentLayer->addChild(check, 10);
+            }
+
+            std::string desc = fmt::format(
+                "{} x{}",
+                name,
+                amount > 0 ? std::to_string(amount) : "1"
+            );
+
+            auto labelName = CCLabelBMFont::create(desc.c_str(), "bigFont.fnt");
+            labelName->setScale(0.4f);
+            labelName->setAnchorPoint({ 0.f, 0.5f });
+            labelName->setPosition({ 80.f, yPos + 12.f });
+            scroll->m_contentLayer->addChild(labelName);
+
+            auto labelRarity = CCLabelBMFont::create(rarity.c_str(), "goldFont.fnt");
+            labelRarity->setScale(0.4f);
+            labelRarity->setAnchorPoint({ 0.f, 0.5f });
+            labelRarity->setPosition({ 80.f, yPos - 12.f });
+
+            ccColor3B rColor = { 255, 255, 255 };
+            std::string rLower = rarity;
+            std::transform(rLower.begin(), rLower.end(), rLower.begin(), ::tolower);
+
+            if (rLower == "common") rColor = { 255, 255, 255 };
+            else if (rLower == "special") rColor = { 0, 255, 0 };
+            else if (rLower == "epic") rColor = { 180, 50, 255 };
+            else if (rLower == "legendary") rColor = { 255, 140, 0 };
+            else if (rLower == "mythic") rColor = { 255, 0, 0 };
+
+            labelRarity->setColor(rColor);
+            scroll->m_contentLayer->addChild(labelRarity);
+
+            int w = weights.count(rarity) ? weights.at(rarity) : defaultWeight;
+            double prob = (w / totalWeight) * 100.0;
+
+            auto labelProb = CCLabelBMFont::create(
+                fmt::format("{:.1f}%", prob).c_str(),
+                "goldFont.fnt"
+            );
+            labelProb->setScale(0.45f);
+            labelProb->setAnchorPoint({ 1.f, 0.5f });
+            labelProb->setPosition({ listSize.width - 30.f, yPos });
+            labelProb->setColor({ 255, 255, 0 });
+            scroll->m_contentLayer->addChild(labelProb);
+
+            index++;
+        }
+
+        scroll->m_contentLayer->setPositionY(listSize.height - totalHeight);
+        m_mainLayer->addChild(scroll);
+
+        return true;
+    }
+
+public:
+    static RewardListPopup* create(const std::map<std::string, matjson::Value>& rewards, const std::map<std::string, int>& weights) {
+        auto ret = new RewardListPopup();
+        if (ret && ret->initAnchored(400.f, 280.f, rewards, weights, "geode.loader/GE_square03.png")) {
+            ret->autorelease();
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
+    }
+};
+
+class EventRoulette : public CCLayer {
+public:
+    CCNode* m_scrollingLayer = nullptr;
+    std::vector<std::string> m_rewardIDs;
+    std::function<void()> m_onSpinRequest;
+    std::function<void()> m_onAnimFinished;
+
+    float m_itemWidth = 95.0f;
+    int m_rejoiceCount = 40;
+
+    bool m_isSpinning = false;
+    int m_lastSoundIndex = -1;
+    float m_soundTimer = 0.f;
+
+    static EventRoulette* create(const std::vector<std::pair<std::string, matjson::Value>>& rewards,
+        int cost, std::string currency, std::function<void()> onSpin) {
+        auto ret = new EventRoulette();
+        if (ret && ret->init(rewards, cost, currency, onSpin)) {
+            ret->autorelease();
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
+    }
+
+    ccColor3B getColorForRarity(std::string rarity) {
+        std::transform(rarity.begin(), rarity.end(), rarity.begin(), ::tolower);
+        if (rarity == "common") return { 255, 255, 255 };
+        if (rarity == "special") return { 0, 255, 0 };
+        if (rarity == "epic") return { 180, 50, 255 };
+        if (rarity == "legendary") return { 255, 140, 0 };
+        if (rarity == "mythic") return { 255, 0, 0 };
+        return { 200, 200, 200 };
+    }
+
+    bool init(const std::vector<std::pair<std::string, matjson::Value>>& rewards,
+        int cost, std::string currency, std::function<void()> onSpin) {
+        if (!CCLayer::init()) return false;
+
+        m_onSpinRequest = onSpin;
+        this->setContentSize({ 340.f, 180.f });
+
+        auto bg = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
+        if (bg) {
+            bg->setContentSize({ 320.f, 90.f });
+            bg->setColor({ 20, 20, 20 });
+            bg->setOpacity(200);
+            bg->setPosition({ this->getContentSize().width / 2, 100.f });
+            this->addChild(bg);
+        }
+
+        auto clipper = CCClippingNode::create();
+        if (clipper) {
+            clipper->setContentSize({ 300.f, 80.f });
+            clipper->setAnchorPoint({ 0.5f, 0.5f });
+            clipper->setPosition({ this->getContentSize().width / 2, 100.f });
+
+            auto stencil = CCLayerColor::create({ 255, 255, 255, 255 });
+            if (stencil) {
+                stencil->setContentSize({ 300.f, 80.f });
+                clipper->setStencil(stencil);
+            }
+            this->addChild(clipper);
+
+            m_scrollingLayer = CCNode::create();
+            if (m_scrollingLayer) {
+                m_scrollingLayer->setPosition({ 0.f, 52.f });
+                clipper->addChild(m_scrollingLayer);
+            }
+        }
+
+        if (!m_scrollingLayer) return true;
+        if (rewards.empty()) return true;
+
+        int totalItems = rewards.size();
+        for (int cycle = 0; cycle < m_rejoiceCount; ++cycle) {
+            for (int i = 0; i < totalItems; ++i) {
+                if (cycle == 0) {
+                    m_rewardIDs.push_back(rewards[i].first);
+                }
+
+                matjson::Value data = rewards[i].second;
+                CCSprite* spr = nullptr;
+                int amount = 0;
+                std::string rarity = data["rarity"].as<std::string>().unwrapOr("Common");
+
+                if (data.contains("badge")) {
+                    std::string badgeID = data["badge"].as<std::string>().unwrapOr("");
+                    auto binfo = g_streakData.getBadgeInfo(badgeID);
+                    if (binfo) spr = CCSprite::create(binfo->spriteName.c_str());
+                    if (!spr) spr = CCSprite::createWithSpriteFrameName("GJ_secretChest_001.png");
+                }
+                else if (data.contains("banner")) {
+                    std::string bannerID = data["banner"].as<std::string>().unwrapOr("");
+                    auto binfo = g_streakData.getBannerInfo(bannerID);
+                    if (binfo) spr = CCSprite::create(binfo->spriteName.c_str());
+                    if (!spr) spr = CCSprite::createWithSpriteFrameName("GJ_secretChest_001.png");
+                }
+                else if (data.contains("super_stars")) {
+                    amount = data["super_stars"].as<int>().unwrapOr(0);
+                    spr = CCSprite::create("super_star.png"_spr);
+                }
+                else if (data.contains("star_tickets")) {
+                    amount = data["star_tickets"].as<int>().unwrapOr(0);
+                    spr = CCSprite::create("star_tiket.png"_spr);
+                }
+
+                if (!spr) spr = CCSprite::createWithSpriteFrameName("GJ_questionMark_001.png");
+                if (!spr) spr = CCSprite::createWithSpriteFrameName("edit_delBtn_001.png");
+
+                if (spr) {
+                    float scale = 0.35f;
+                    if (spr->getContentSize().width > 90.f) scale = 0.22f;
+                    spr->setScale(scale);
+
+                    float posX = (cycle * totalItems * m_itemWidth) + (i * m_itemWidth) + (m_itemWidth / 2);
+                    spr->setPosition({ posX, 10.f });
+                    m_scrollingLayer->addChild(spr);
+
+                    if (amount > 0) {
+                        auto label = CCLabelBMFont::create(
+                            fmt::format("x{}", amount).c_str(),
+                            "goldFont.fnt"
+                        );
+                        if (label) {
+                            label->setScale(0.35f);
+                            label->setPosition({ posX, -20.f });
+                            m_scrollingLayer->addChild(label);
+                        }
+                    }
+                    else if (data.contains("badge")) {
+                        auto label = CCLabelBMFont::create("Badge", "goldFont.fnt");
+                        if (label) {
+                            label->setScale(0.35f);
+                            label->setPosition({ posX, -20.f });
+                            m_scrollingLayer->addChild(label);
+                        }
+                    }
+
+                    auto rarityLbl = CCLabelBMFont::create(rarity.c_str(), "goldFont.fnt");
+                    if (rarityLbl) {
+                        rarityLbl->setScale(0.25f);
+                        rarityLbl->setPosition({ posX, -35.f });
+                        rarityLbl->setColor(getColorForRarity(rarity));
+                        m_scrollingLayer->addChild(rarityLbl);
+                    }
+                }
+            }
+        }
+
+        auto arrow = CCSprite::create("trist.png"_spr);
+        if (arrow) {
+            arrow->setPosition({ this->getContentSize().width / 2, 148.f });
+            arrow->setRotation(180);
+            arrow->setScale(0.8f);
+            this->addChild(arrow, 10);
+        }
+
+        auto arrowBottom = CCSprite::create("trist.png"_spr);
+        if (arrowBottom) {
+            arrowBottom->setPosition({ this->getContentSize().width / 2, 52.f });
+            arrowBottom->setScale(0.8f);
+            this->addChild(arrowBottom, 10);
+        }
+
+        auto menu = CCMenu::create();
+        if (menu) {
+            menu->setPosition({ this->getContentSize().width / 2, -8.f });
+            this->addChild(menu, 10);
+
+            std::string btnText = "Spin";
+            const char* currencySpr = "";
+
+            if (cost > 0) {
+                btnText = fmt::format("     {}", cost);
+                if (currency == "stars") currencySpr = "super_star.png"_spr;
+                else currencySpr = "star_tiket.png"_spr;
+            }
+
+            auto btnSpr = ButtonSprite::create(
+                btnText.c_str(),
+                0,
+                false,
+                "goldFont.fnt",
+                "GJ_button_01.png",
+                0,
+                0.8f
+            );
+
+            if (btnSpr) {
+                if (cost > 0 && strlen(currencySpr) > 0) {
+                    auto icon = CCSprite::create(currencySpr);
+                    if (!icon) icon = CCSprite::create("star_tiket.png"_spr);
+
+                    if (icon) {
+                        icon->setScale(0.2f);
+                        icon->setPosition({ 25.f, btnSpr->getContentSize().height / 2 });
+                        btnSpr->addChild(icon);
+                    }
+                }
+
+                auto btn = CCMenuItemSpriteExtra::create(
+                    btnSpr,
+                    this,
+                    menu_selector(EventRoulette::onSpinClick)
+                );
+                if (btn) menu->addChild(btn);
+            }
+        }
+
+        this->scheduleUpdate();
+        return true;
+    }
+
+    void onSpinClick(CCObject*) {
+        if (m_onSpinRequest) m_onSpinRequest();
+    }
+
+    void stopSpinning() {
+        m_isSpinning = false;
+    }
+
+    void update(float dt) override {
+        if (!m_isSpinning || !m_scrollingLayer) return;
+
+        m_soundTimer += dt;
+
+        float currentX = std::abs(m_scrollingLayer->getPositionX());
+        float viewCenter = currentX + 150.f;
+
+        int currentIndex = static_cast<int>(viewCenter / m_itemWidth);
+
+        if (currentIndex != m_lastSoundIndex) {
+            if (m_soundTimer > 0.06f) {
+                FMODAudioEngine::sharedEngine()->playEffect("ruleta_sfx.mp3"_spr);
+                m_soundTimer = 0.f;
+            }
+            m_lastSoundIndex = currentIndex;
+        }
+    }
+
+    void spinToID(std::string winID, std::function<void()> onFinishAnim) {
+        m_onAnimFinished = onFinishAnim;
+
+        m_scrollingLayer->stopAllActions();
+        m_scrollingLayer->setPosition({ 0.f, 52.f });
+
+        int baseIndex = -1;
+        for (size_t i = 0; i < m_rewardIDs.size(); ++i) {
+            if (m_rewardIDs[i] == winID) {
+                baseIndex = i;
+                break;
+            }
+        }
+
+        if (baseIndex == -1 || !m_scrollingLayer) {
+            this->onAnimationDone();
+            return;
+        }
+
+        m_isSpinning = true;
+        m_soundTimer = 1.0f;
+
+        int targetCycle = m_rejoiceCount - 5;
+        int totalIndex = (targetCycle * m_rewardIDs.size()) + baseIndex;
+        float targetX = -((totalIndex * m_itemWidth) + (m_itemWidth / 2)) + 150.f;
+
+        auto move = CCEaseExponentialOut::create(
+            CCMoveTo::create(6.0f, { targetX, 52.f })
+        );
+
+        auto seq = CCSequence::create(
+            move,
+            CCCallFunc::create(this, callfunc_selector(EventRoulette::stopSpinning)),
+            CCDelayTime::create(0.5f),
+            CCCallFunc::create(this, callfunc_selector(EventRoulette::onAnimationDone)),
+            nullptr
+        );
+        m_scrollingLayer->runAction(seq);
+    }
+
+    void onAnimationDone() {
+        if (m_onAnimFinished) m_onAnimFinished();
+    }
+};
 
 class EventPopup : public Popup<> {
 protected:
-    CCLabelBMFont* m_statusLabel = nullptr;
     CCLayer* m_contentLayer = nullptr;
     CCMenu* m_rewardMenu = nullptr;
-    CCLayer* m_barFill = nullptr;
-    CCDrawNode* m_indicatorNode = nullptr;
-    std::string m_eventID, m_eventName, m_claimingID;
-    matjson::Value m_eventRewards, m_playerProgress;
-    EventListener<web::WebTask> m_loadListener, m_claimListener;
+    StatusSpinner* m_spinner = nullptr;
+    EventRoulette* m_rouletteLayer = nullptr;
+    CCLabelBMFont* m_ticketLabel = nullptr;
+
+    std::string m_eventID;
+    std::string m_eventName;
+    std::string m_claimingID;
+    std::string m_eventType = "days";
+
+    int m_spinCost = 0;
+    std::string m_spinCurrency = "tickets";
+
+    matjson::Value m_eventRewards;
+    matjson::Value m_playerProgress;
+    std::map<std::string, int> m_rarityWeights;
+
+    EventListener<web::WebTask> m_loadListener;
+    EventListener<web::WebTask> m_claimListener;
+
     bool m_isClaiming = false;
+
+    int m_tempStars = 0;
+    int m_tempTickets = 0;
+    std::string m_tempBadgeID = "";
+    std::string m_tempBannerID = "";
+    bool m_tempSuccess = false;
+
     std::vector<CCLabelBMFont*> m_mythicLabels;
     std::vector<ccColor3B> m_mythicColors;
-    int m_colorIndex = 0; 
+    int m_colorIndex = 0;
     float m_colorTransitionTime = 0.0f;
-    ccColor3B m_currentColor, m_targetColor;
+    ccColor3B m_currentColor;
+    ccColor3B m_targetColor;
 
     bool setup() override {
         this->setTitle("Event");
         auto winSize = m_mainLayer->getContentSize();
-        auto listSize = CCSize{ 340.f, 160.f };
+        auto listSize = CCSize{ 340.f, 200.f };
+
         auto listBg = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
+        if (listBg) {
+            listBg->setContentSize(listSize);
+            listBg->setColor({ 0, 0, 0 });
+            listBg->setOpacity(120);
+            listBg->setPosition(winSize / 2);
+        }
 
-        listBg->setContentSize(listSize);
-        listBg->setColor({ 0, 0, 0 }); 
-        listBg->setOpacity(120); 
-        listBg->setPosition(
-            winSize / 2 + CCPoint{ 0, 10.f 
-            });
-
-        m_mainLayer->addChild(listBg);
         m_contentLayer = CCLayer::create();
         m_contentLayer->setContentSize(listSize);
-        m_contentLayer->setPosition(
-            listBg->getPosition() - listBg->getContentSize() / 2
-        ); 
-
+        if (listBg) {
+            m_contentLayer->setPosition(listBg->getPosition() - listBg->getContentSize() / 2);
+        }
+        else {
+            m_contentLayer->setPosition(winSize / 2 - listSize / 2);
+        }
         m_mainLayer->addChild(m_contentLayer);
+
+        auto bagSpr = CCSprite::create("bag.png"_spr);
+        if (!bagSpr) {
+            bagSpr = CCSprite::createWithSpriteFrameName("GJ_safeIcon_001.png");
+        }
+
+        if (bagSpr) {
+            bagSpr->setScale(0.4f);
+            auto bagBtn = CCMenuItemSpriteExtra::create(
+                bagSpr,
+                this,
+                menu_selector(EventPopup::onRewardList)
+            );
+            auto bagMenu = CCMenu::create();
+            bagMenu->addChild(bagBtn);
+
+            float paddingX = 28.f;
+            float paddingY = -10.f;
+
+            bagMenu->setPosition({
+                (winSize.width / 2) + (listSize.width / 2) - paddingX,
+                (winSize.height / 2) - (listSize.height / 2) + paddingY
+                });
+            m_mainLayer->addChild(bagMenu, 50);
+        }
 
         auto streakIcon = CCSprite::create(g_streakData.getRachaSprite().c_str());
         if (!streakIcon) streakIcon = CCSprite::create("racha0.png"_spr);
-        streakIcon->setScale(0.18f); 
-        streakIcon->setAnchorPoint({ 0.f, 0.5f });
+        if (streakIcon) {
+            streakIcon->setScale(0.18f);
+            streakIcon->setAnchorPoint({ 0.f, 0.5f });
+        }
+
         auto streakLabel = CCLabelBMFont::create(
             std::to_string(g_streakData.currentStreak).c_str(),
             "goldFont.fnt"
         );
+        if (streakLabel) {
+            streakLabel->setScale(0.6f);
+            streakLabel->setAnchorPoint({ 0.f, 0.5f });
+        }
 
-        streakLabel->setScale(0.6f);
-        streakLabel->setAnchorPoint({ 0.f, 0.5f });
-        float padding = 8.f, gap = 2.f;
-        streakIcon->setPosition({
-            padding,
-            padding + (streakIcon->getContentSize().height * streakIcon->getScaleY()) / 2
+        float popupTopY = (winSize.height / 2) + (listSize.height / 2);
+        float popupLeftX = (winSize.width / 2) - (listSize.width / 2);
+        float popupBottomY = (winSize.height / 2) - (listSize.height / 2) - 15.f;
+
+        if (streakIcon) {
+            streakIcon->setPosition({ popupLeftX + 10.f, popupTopY + 20.f });
+            m_mainLayer->addChild(streakIcon);
+        }
+        if (streakLabel && streakIcon) {
+            streakLabel->setPosition({
+                streakIcon->getPositionX() + 25.f,
+                streakIcon->getPositionY()
+                });
+            m_mainLayer->addChild(streakLabel);
+        }
+
+        auto ticketIcon = CCSprite::create("star_tiket.png"_spr);
+        if (ticketIcon) {
+            ticketIcon->setScale(0.25f);
+            ticketIcon->setPosition({ popupLeftX + 20.f, popupBottomY });
+            m_mainLayer->addChild(ticketIcon);
+
+            m_ticketLabel = CCLabelBMFont::create(
+                std::to_string(g_streakData.starTickets).c_str(),
+                "goldFont.fnt"
+            );
+            if (m_ticketLabel) {
+                m_ticketLabel->setScale(0.5f);
+                m_ticketLabel->setAnchorPoint({ 0.0f, 0.5f });
+                m_ticketLabel->setPosition({
+                    ticketIcon->getPositionX() + 15.f,
+                    ticketIcon->getPositionY()
+                    });
+                m_mainLayer->addChild(m_ticketLabel);
             }
-        );
+        }
 
-        m_mainLayer->addChild(streakIcon);
-        streakLabel->setPosition({
-            streakIcon->getPositionX() + (
-                streakIcon->getContentSize().width * streakIcon->getScaleX()) + gap,
-                streakIcon->getPositionY() 
-            }
-        );
-
-        m_mainLayer->addChild(streakLabel);
-
-        m_statusLabel = CCLabelBMFont::create("Loading Event...", "bigFont.fnt");
-        m_statusLabel->setPosition(
-            winSize / 2 + CCPoint{ 0, 10.f }
-        );
-
-        m_statusLabel->setScale(0.7f);
-        m_statusLabel->setVisible(false);
-        m_mainLayer->addChild(m_statusLabel, 10);
+        m_spinner = StatusSpinner::create();
+        m_spinner->setPosition(winSize / 2);
+        m_mainLayer->addChild(m_spinner, 20);
 
         m_loadListener.bind(this, &EventPopup::onEventResponse);
         m_claimListener.bind(this, &EventPopup::onClaimResponse);
+
         m_mythicColors = {
-            ccc3(255, 0, 0), 
-            ccc3(255, 165, 0), 
-            ccc3(255, 255, 0), 
-            ccc3(0, 255, 0),
-            ccc3(0, 0, 255), 
-            ccc3(75, 0, 130), 
+            ccc3(255, 0, 0), ccc3(255, 165, 0), ccc3(255, 255, 0),
+            ccc3(0, 255, 0), ccc3(0, 0, 255), ccc3(75, 0, 130),
             ccc3(238, 130, 238)
         };
-
         m_currentColor = m_mythicColors[0];
         m_targetColor = m_mythicColors[1];
+
         this->scheduleUpdate();
         this->loadEvent();
         return true;
+    }
+
+    void onRewardList(CCObject*) {
+        if (!m_eventRewards.isObject()) return;
+
+        std::map<std::string, matjson::Value> rewardsMap;
+        try {
+            rewardsMap = m_eventRewards.as<std::map<std::string, matjson::Value>>().unwrap();
+        }
+        catch (...) { return; }
+
+        if (m_rarityWeights.empty()) {
+            m_rarityWeights["Common"] = 100;
+        }
+
+        auto popup = RewardListPopup::create(rewardsMap, m_rarityWeights);
+        popup->show();
     }
 
     void update(float dt) override {
@@ -108,348 +672,339 @@ protected:
         m_colorTransitionTime += dt;
         if (m_colorTransitionTime >= 1.0f) {
             m_colorTransitionTime = 0.0f;
-            m_colorIndex = (m_colorIndex + 1) % m_mythicColors.size(); 
+            m_colorIndex = (m_colorIndex + 1) % m_mythicColors.size();
             m_currentColor = m_targetColor;
             m_targetColor = m_mythicColors[(m_colorIndex + 1) % m_mythicColors.size()];
         }
-
         float progress = m_colorTransitionTime / 1.0f;
-        ccColor3B interpolatedColor = { 
-            static_cast<GLubyte>(m_currentColor.r + (m_targetColor.r - m_currentColor.r) * progress), 
+        ccColor3B interpolatedColor = {
+            static_cast<GLubyte>(m_currentColor.r + (m_targetColor.r - m_currentColor.r) * progress),
             static_cast<GLubyte>(m_currentColor.g + (m_targetColor.g - m_currentColor.g) * progress),
-            static_cast<GLubyte>(m_currentColor.b + (m_targetColor.b - m_currentColor.b) * progress) 
+            static_cast<GLubyte>(m_currentColor.b + (m_targetColor.b - m_currentColor.b) * progress)
         };
-
-        for (auto* label : m_mythicLabels) label->setColor(interpolatedColor);
+        for (auto* label : m_mythicLabels) {
+            label->setColor(interpolatedColor);
+        }
     }
+
     void onClose(CCObject* sender) override {
         this->unscheduleUpdate();
         Popup::onClose(sender);
     }
 
+    void updateLabels() {
+        if (m_ticketLabel) {
+            m_ticketLabel->setString(
+                std::to_string(g_streakData.starTickets).c_str()
+            );
+        }
+    }
 
     void loadEvent() {
-        m_statusLabel->setString("Loading Event...");
-        m_statusLabel->setVisible(true);
+        m_spinner->setLoading("Loading...");
         m_contentLayer->setVisible(false);
         auto req = web::WebRequest();
-        m_loadListener.setFilter(
-            req.get(
-                fmt::format("https://streak-servidor.onrender.com/event/current/{}",
-                GJAccountManager::sharedState()->m_accountID))
-        );
+        m_loadListener.setFilter(req.get(fmt::format(
+            "https://streak-servidor.onrender.com/event/current/{}?type=roulette",
+            GJAccountManager::sharedState()->m_accountID
+        )));
     }
 
     void onEventResponse(web::WebTask::Event* e) {
         if (!e->getValue() && !e->isCancelled()) return;
+
         if (web::WebResponse* res = e->getValue()) {
-            if (res->code() == 404) { m_statusLabel->setString("No Active Event");
-            return;
+            if (res->code() == 404) {
+                m_spinner->setError("No active event");
+                return;
             }
 
             if (res->ok() && res->json().isOk()) {
                 auto data = res->json().unwrap();
-                m_eventID = data["event"]["eventID"].as<std::string>().unwrapOr("error_id");
-                m_eventName = data["event"]["eventName"].as<std::string>().unwrapOr("Event");
-                m_eventRewards = data["event"]["rewards"];
+                auto eventData = data["event"];
+
+                bool activeNormal = eventData["isActive"].as<bool>().unwrapOr(false);
+                bool activeRoulette = eventData["isActiveRoulette"].as<bool>().unwrapOr(false);
+
+                if (!activeNormal && !activeRoulette) {
+                    m_spinner->setError("No active event");
+                    return;
+                }
+
+                m_eventID = eventData["eventID"].as<std::string>().unwrapOr("error_id");
+                m_eventName = eventData["eventName"].as<std::string>().unwrapOr("Event");
+                m_eventType = eventData["eventType"].as<std::string>().unwrapOr("days");
+
+                m_spinCost = eventData["spinCost"].as<int>().unwrapOr(0);
+                m_spinCurrency = eventData["spinCurrency"].as<std::string>().unwrapOr("tickets");
+
+                m_eventRewards = eventData["rewards"];
                 m_playerProgress = data["progress"];
+
+                m_rarityWeights.clear();
+                if (eventData.contains("rarityWeights")) {
+                    auto wMap = eventData["rarityWeights"].as<std::map<std::string, int>>().unwrapOr(std::map<std::string, int>());
+                    m_rarityWeights = wMap;
+                }
+
                 this->setTitle(m_eventName.c_str());
-                m_statusLabel->setVisible(false);
+
+                m_spinner->hide();
                 m_contentLayer->setVisible(true);
-                this->buildList();
+
+                if (m_eventType == "roulette") {
+                    this->buildRoulette();
+                }
+                else {
+                    this->buildList();
+                }
             }
-            else m_statusLabel->setString("Failed to load event");
+            else {
+                m_spinner->setError("Error loading");
+            }
         }
+    }
+
+    void buildRoulette() {
+        m_contentLayer->removeAllChildren();
+        m_mythicLabels.clear();
+        m_rouletteLayer = nullptr;
+        m_rewardMenu = nullptr;
+
+        if (!m_eventRewards.isObject()) return;
+
+        std::vector<std::pair<std::string, matjson::Value>> rewardsVec;
+        auto rewardsMap = m_eventRewards.as<std::map<std::string, matjson::Value>>().unwrap();
+        for (const auto& pair : rewardsMap) {
+            rewardsVec.push_back(pair);
+        }
+
+        m_rouletteLayer = EventRoulette::create(
+            rewardsVec,
+            m_spinCost,
+            m_spinCurrency,
+            [this]() { this->onClaimRoulette(); }
+        );
+
+        if (m_rouletteLayer) {
+            m_rouletteLayer->setPosition({
+                (m_contentLayer->getContentSize().width - m_rouletteLayer->getContentSize().width) / 2,
+                (m_contentLayer->getContentSize().height - m_rouletteLayer->getContentSize().height) / 2
+                });
+            m_contentLayer->addChild(m_rouletteLayer);
+        }
+    }
+
+    void onClaimRoulette() {
+        if (m_isClaiming) return;
+
+        if (m_spinCost > 0) {
+            if (m_spinCurrency == "stars" && g_streakData.superStars < m_spinCost) {
+                FLAlertLayer::create("Error", "You don't have enough Super Stars", "OK")->show();
+                return;
+            }
+            if (m_spinCurrency != "stars" && g_streakData.starTickets < m_spinCost) {
+                FLAlertLayer::create("Error", "You don't have enough Star Tickets", "OK")->show();
+                return;
+            }
+        }
+
+        m_isClaiming = true;
+        m_spinner->setLoading("Connecting...");
+        m_contentLayer->setVisible(false);
+
+        matjson::Value payload = matjson::Value::object();
+        payload.set("accountID", GJAccountManager::sharedState()->m_accountID);
+        payload.set("eventID", m_eventID);
+        payload.set("claimID", "roulette_spin");
+
+        auto req = web::WebRequest();
+        m_claimListener.setFilter(req.bodyJSON(payload).post(
+            "https://streak-servidor.onrender.com/event/claim"
+        ));
     }
 
     void buildList() {
         m_contentLayer->removeAllChildren();
         m_mythicLabels.clear();
+        m_rouletteLayer = nullptr;
+        m_rewardMenu = nullptr;
         if (!m_eventRewards.isObject()) return;
-
-        std::vector<std::pair<std::string, matjson::Value>> sortedRewards;
-        auto rewardsMap = m_eventRewards.as<std::map<std::string, matjson::Value>>().unwrap();
-        for (const auto& pair : rewardsMap) sortedRewards.push_back(pair);
-        std::sort(sortedRewards.begin(), sortedRewards.end(), [](const auto& a, const auto& b) {
-            return a.second["day"].template as<int>().unwrapOr(999) < b.second["day"].template as<int>().unwrapOr(999);
-            }
-        );
-
-        if (sortedRewards.empty()) {
-            m_statusLabel->setString("Event is empty");
-            m_statusLabel->setVisible(true);
-            return;
-        }
-
-        float barWidth = 300.f, barHeight = 10.f;
-        float barCenterY = m_contentLayer->getContentSize().height / 2 - 20.f;
-        float barStartX = (m_contentLayer->getContentSize().width - barWidth) / 2;
-
-        m_rewardMenu = CCMenu::create();
-        m_rewardMenu->setPosition({ 0, 0 });
-        m_contentLayer->addChild(m_rewardMenu, 10);
-        auto labelNode = CCNode::create();
-        m_contentLayer->addChild(labelNode, 15);
-
-        int currentStreak = g_streakData.currentStreak;
-        int maxDay = sortedRewards.back().second["day"].as<int>().unwrapOr(1);
-        if (maxDay == 0) maxDay = 1;
-        float fillPercent = std::min(1.f, static_cast<float>(currentStreak) / maxDay);
-
-        auto outer = CCLayerColor::create(
-            { 0, 0, 0, 70 },
-            barWidth + 6, barHeight + 6);
-        outer->setPosition({ barStartX - 3, barCenterY - (barHeight / 2) - 3 });
-        m_contentLayer->addChild(outer, 0);
-        auto border = CCLayerColor::create(
-            { 255, 255, 255, 120 },
-            barWidth + 2, barHeight + 2);
-        border->setPosition({
-            barStartX - 1,
-            barCenterY - (barHeight / 2) - 1 
-            }
-        );
-
-        m_contentLayer->addChild(border, 4);
-        auto barBg = CCLayerColor::create(
-            { 45, 45, 45, 255 },
-            barWidth, barHeight);
-            barBg->setPosition({ barStartX, barCenterY - (barHeight / 2) });
-            m_contentLayer->addChild(barBg, 1);
-
-        auto clipper = CCClippingNode::create();
-        clipper->setPosition({ 
-            barStartX, barCenterY - (barHeight / 2) 
-            }
-        );
-
-        auto stencil = CCLayerColor::create(
-            { 255, 255, 255, 255 }, 
-            barWidth,
-            barHeight);
-            stencil->setPosition({ 0, 0 });
-            clipper->setStencil(stencil);
-            m_barFill = CCLayerGradient::create(
-               { 100, 255, 100, 255 },
-               { 0, 200, 0, 255 }
-            );
-
-            m_barFill->setContentSize({
-                barWidth * fillPercent, barHeight
-                }
-            ); 
-
-            m_barFill->setPosition({ 0, 0 }); 
-            clipper->addChild(m_barFill);
-            m_contentLayer->addChild(clipper, 2);
-
-        for (size_t i = 0; i < sortedRewards.size(); ++i) {
-            const auto& [claimID, rewardData] = sortedRewards[i];
-            int dayRequired = rewardData["day"].as<int>().unwrapOr(0);
-            float rewardPercent = (maxDay == 0) ? 0 : static_cast<float>(dayRequired) / maxDay;
-            float rewardX = barStartX + (barWidth * rewardPercent);
-            float rewardY = barCenterY + 40.f;
-
-            bool isClaimed = m_playerProgress[claimID].as<bool>().unwrapOr(false);
-            bool isAvailable = !isClaimed && currentStreak >= dayRequired;
-
-            CCSprite* rewardSprite = nullptr;
-            std::string badgeID = "";
-            int rewardAmount = 0;
-
-            if (rewardData.contains("badge")) {
-                badgeID = rewardData["badge"].as<std::string>().unwrapOr("");
-                auto binfo = g_streakData.getBadgeInfo(badgeID);
-                rewardSprite = CCSprite::create(
-                    binfo ? binfo->spriteName.c_str() : "GJ_secretChest_001.png"
-                );
-            }
-            else if (rewardData.contains("super_stars")) {
-                rewardAmount = rewardData["super_stars"].as<int>().unwrapOr(0);
-                rewardSprite = CCSprite::create("super_star.png"_spr);
-            }
-
-            else if (rewardData.contains("star_tickets")) {
-                rewardAmount = rewardData["star_tickets"].as<int>().unwrapOr(0); 
-                rewardSprite = CCSprite::create("star_tiket.png"_spr);
-            }
-
-            if (!rewardSprite) rewardSprite = CCSprite::createWithSpriteFrameName("GJ_questionMark_001.png");
-            rewardSprite->setScale(0.22f);
-
-
-            if (i == sortedRewards.size() - 1) {
-                auto shine = CCSprite::createWithSpriteFrameName("shineBurst_001.png"); 
-                shine->setBlendFunc({ GL_SRC_ALPHA, GL_ONE }); 
-                shine->setScale(3.0f); 
-                shine->runAction(CCRepeatForever::create(CCRotateBy::create(4.0f, 360.f)));
-                shine->setPosition(rewardSprite->getContentSize() / 2);
-                rewardSprite->addChild(shine, -1);
-            }
-
-            auto btn = CCMenuItemSpriteExtra::create(rewardSprite, this, menu_selector(EventPopup::onClaim));
-            btn->setUserObject("claim-id"_spr, CCString::create(claimID));
-            btn->setID(claimID);
-            btn->setPosition({ rewardX, rewardY });
-            m_rewardMenu->addChild(btn);
-
-            if (rewardAmount > 0) {
-                auto amountLabel = CCLabelBMFont::create(fmt::format("x{}", rewardAmount).c_str(), "goldFont.fnt");
-                amountLabel->setScale(0.5f);
-                amountLabel->setAnchorPoint({ 0.5f, 1.0f });
-                amountLabel->setPosition({ rewardX, rewardY - 14.f });
-                labelNode->addChild(amountLabel, 11);
-            }
-            else if (!badgeID.empty()) {
-                if (auto binfo = ::g_streakData.getBadgeInfo(badgeID)) {
-                    auto categoryLabel = CCLabelBMFont::create(::g_streakData.getCategoryName(
-                        binfo->category).c_str(), "goldFont.fnt"
-                    );
-
-                    categoryLabel->setScale(0.45f);
-                    categoryLabel->setAnchorPoint({ 0.5f, 1.0f });
-                    categoryLabel->setPosition(
-                        { rewardX, rewardY - 14.f }
-                    );
-
-                    if (binfo->category == ::StreakData::BadgeCategory::MYTHIC) m_mythicLabels.push_back(categoryLabel);
-
-                    else categoryLabel->setColor(::g_streakData.getCategoryColor(binfo->category));
-                    labelNode->addChild(categoryLabel, 11);
-                }
-            }
-
-            auto dayLabel = CCLabelBMFont::create(
-                fmt::format("Day {}",
-                dayRequired).c_str(),
-                "goldFont.fnt"
-            );
-
-            dayLabel->setScale(0.45f);
-            dayLabel->setPosition({ rewardX, barCenterY - 20.f });
-            labelNode->addChild(dayLabel);
-
-            std::string rachaSpriteName = (currentStreak >= dayRequired) ? g_streakData.getRachaSprite(dayRequired) : "racha0.png"_spr;
-            auto rachaIcon = CCSprite::create(rachaSpriteName.c_str());
-            if (!rachaIcon) rachaIcon = CCSprite::createWithSpriteFrameName("GJ_lock_001.png");
-            rachaIcon->setScale(0.14f); 
-            rachaIcon->setPosition({ rewardX, barCenterY });
-            labelNode->addChild(rachaIcon, 6);
-
-            if (isClaimed) {
-                btn->setEnabled(false);
-                auto check = CCSprite::createWithSpriteFrameName("GJ_completesIcon_001.png");
-                check->setScale(1.0f);
-                check->setPosition({ rewardX, rewardY });
-                labelNode->addChild(check, 10);
-            }
-            else if (!isAvailable) {
-                btn->setEnabled(false); 
-                rewardSprite->setColor({ 120, 120, 120 });
-            }
-            else {
-                btn->runAction(CCRepeatForever::create(
-                    CCSequence::create(CCScaleTo::create(0.7f, 1.1f), 
-                        CCScaleTo::create(0.7f, 1.0f),
-                        nullptr))
-                );
-            }
-        }
-    }
-
-    void onClaim(CCObject* sender) {
-        if (m_isClaiming) return;
-        m_isClaiming = true;
-        if (m_rewardMenu) m_rewardMenu->setEnabled(false);
-        m_statusLabel->setString("Claiming...");
-        m_statusLabel->setVisible(true);
-        auto btn = static_cast<CCMenuItemSpriteExtra*>(sender);
-        m_claimingID = static_cast<CCString*>(btn->getUserObject("claim-id"_spr))->getCString();
-        matjson::Value payload = matjson::Value::object();
-
-
-        payload.set(
-            "accountID", GJAccountManager::sharedState()->m_accountID
-        );
-        payload.set(
-            "eventID", m_eventID
-        ); 
-        payload.set(
-            "claimID", m_claimingID
-        );
-        auto req = web::WebRequest();
-        m_claimListener.setFilter(req.bodyJSON(payload).post("https://streak-servidor.onrender.com/event/claim"));
+        m_spinner->setError("List Mode Disabled in this version");
     }
 
     void onClaimResponse(web::WebTask::Event* e) {
-        m_isClaiming = false; 
-        m_statusLabel->setVisible(false); 
-        if (e->isCancelled()) { this->buildList();
-        return; 
-    }
+        if (e->isCancelled()) {
+            m_isClaiming = false;
+            m_spinner->hide();
+            m_contentLayer->setVisible(true);
+            if (m_eventType == "roulette") {
+                buildRoulette();
+            }
+            else {
+                buildList();
+            }
+            return;
+        }
 
         if (web::WebResponse* res = e->getValue()) {
-            if (res->ok()) {
-                auto rewardData = m_eventRewards[m_claimingID];
+            m_tempSuccess = res->ok();
+            m_spinner->hide();
+            m_contentLayer->setVisible(true);
 
-                int starsWon = 0;
-                int ticketsWon = 0;
-                std::string badgeID = "";
-
-              
-                if (rewardData.contains("super_stars")) starsWon = rewardData["super_stars"].as<int>().unwrapOr(0);
-                if (rewardData.contains("star_tickets")) ticketsWon = rewardData["star_tickets"].as<int>().unwrapOr(0);
-                if (rewardData.contains("badge")) badgeID = rewardData["badge"].as<std::string>().unwrapOr("");
-
-          
-                int starsStart = g_streakData.superStars;
-                int ticketsStart = g_streakData.starTickets;
-
-                g_streakData.superStars += starsWon;
-                g_streakData.starTickets += ticketsWon;
-                bool isNewBadge = false;
-                if (!badgeID.empty()) {
-                    isNewBadge = !g_streakData.isBadgeUnlocked(badgeID);
-                    g_streakData.unlockBadge(badgeID);
+            if (m_tempSuccess) {
+                if (m_spinCost > 0) {
+                    if (m_spinCurrency == "stars") g_streakData.superStars -= m_spinCost;
+                    else g_streakData.starTickets -= m_spinCost;
+                    this->updateLabels();
                 }
-                g_streakData.save();
 
-                auto showConsumables = [starsWon, ticketsWon, starsStart, ticketsStart]() {
-                    if (starsWon > 0) RewardNotification::show("super_star.png"_spr, starsStart, starsWon);
-                    if (ticketsWon > 0) RewardNotification::show("star_tiket.png"_spr, ticketsStart, ticketsWon);
-                    };
+                auto jsonRes = res->json().unwrapOr(matjson::Value::object());
+                m_claimingID = jsonRes["rewardID"].as<std::string>().unwrapOr("");
 
-               
-                if (!badgeID.empty() && isNewBadge) {
-                    auto* badgeInfo = g_streakData.getBadgeInfo(badgeID);
+                if (m_eventRewards.contains(m_claimingID)) {
+                    auto rewardData = m_eventRewards[m_claimingID];
+                    parseRewardData(rewardData);
+                }
+
+                if (m_eventType == "roulette" && m_rouletteLayer) {
+                    m_rouletteLayer->spinToID(m_claimingID, [this]() { this->finalizeClaim(); });
+                    return;
+                }
+            }
+            else {
+                if (res->code() == 402) {
+                    FLAlertLayer::create("Error", "Insufficient Balance on Server", "OK")->show();
+                }
+                else {
+                    FLAlertLayer::create("Error", "Error processing turn", "OK")->show();
+                }
+            }
+
+            float remainingTime = 1.0f;
+            this->runAction(CCSequence::create(
+                CCDelayTime::create(remainingTime),
+                CCCallFunc::create(this, callfunc_selector(EventPopup::restoreUI)),
+                nullptr
+            ));
+        }
+    }
+
+    void parseRewardData(matjson::Value& rewardData) {
+        m_tempStars = 0;
+        m_tempTickets = 0;
+        m_tempBadgeID = "";
+        m_tempBannerID = "";
+
+        if (rewardData.contains("super_stars")) {
+            m_tempStars = rewardData["super_stars"].as<int>().unwrapOr(0);
+        }
+        if (rewardData.contains("star_tickets")) {
+            m_tempTickets = rewardData["star_tickets"].as<int>().unwrapOr(0);
+        }
+        if (rewardData.contains("badge")) {
+            m_tempBadgeID = rewardData["badge"].as<std::string>().unwrapOr("");
+        }
+        if (rewardData.contains("banner")) {
+            m_tempBannerID = rewardData["banner"].as<std::string>().unwrapOr("");
+        }
+    }
+
+    void finalizeClaim() {
+        if (m_tempSuccess) {
+            int starsStart = g_streakData.superStars;
+            int ticketsStart = g_streakData.starTickets;
+
+            g_streakData.superStars += m_tempStars;
+            g_streakData.starTickets += m_tempTickets;
+
+            bool isNewBadge = false;
+            if (!m_tempBadgeID.empty()) {
+                isNewBadge = !g_streakData.isBadgeUnlocked(m_tempBadgeID);
+                if (isNewBadge) {
+                    g_streakData.unlockBadge(m_tempBadgeID);
+                }
+            }
+
+            bool isNewBanner = false;
+            if (!m_tempBannerID.empty()) {
+                isNewBanner = !g_streakData.isBannerUnlocked(m_tempBannerID);
+                if (isNewBanner) {
+                    g_streakData.unlockBanner(m_tempBannerID);
+                }
+            }
+
+            g_streakData.save();
+            this->updateLabels();
+
+            auto showConsumables = [this, starsStart, ticketsStart]() {
+                if (m_tempStars > 0) {
+                    RewardNotification::show("super_star.png"_spr, starsStart, m_tempStars);
+                }
+                if (m_tempTickets > 0) {
+                    RewardNotification::show("star_tiket.png"_spr, ticketsStart, m_tempTickets);
+                }
+                };
+
+            if (!m_tempBadgeID.empty()) {
+                if (isNewBadge) {
+                    auto* badgeInfo = g_streakData.getBadgeInfo(m_tempBadgeID);
                     if (badgeInfo && badgeInfo->category == StreakData::BadgeCategory::MYTHIC) {
-                        auto animLayer = MythicAnimationLayer::create(*badgeInfo, [badgeID, showConsumables]() {
-                            BadgeNotification::show(badgeID);
-                            showConsumables();
-                            });
+                        auto animLayer = MythicAnimationLayer::create(
+                            *badgeInfo,
+                            [this, showConsumables]() {
+                                BadgeNotification::show(m_tempBadgeID);
+                                showConsumables();
+                            }
+                        );
                         CCDirector::sharedDirector()->getRunningScene()->addChild(animLayer, 99999);
                     }
                     else {
-                        BadgeNotification::show(badgeID);
+                        BadgeNotification::show(m_tempBadgeID);
                         showConsumables();
                     }
                 }
                 else {
+                    Notification::create("You already have this item", NotificationIcon::Info)->show();
                     showConsumables();
                 }
-
-                m_playerProgress.set(m_claimingID, true);
-                this->buildList();
             }
-            else this->buildList();
+            else if (!m_tempBannerID.empty()) {
+                if (isNewBanner) {
+                    BadgeNotification::show(m_tempBannerID);
+                    showConsumables();
+                }
+                else {
+                    Notification::create("You already have this item", NotificationIcon::Info)->show();
+                    showConsumables();
+                }
+            }
+            else {
+                showConsumables();
+            }
+
+            m_isClaiming = false;
         }
-        else this->buildList();
+        else {
+            this->restoreUI();
+        }
+    }
+
+    void restoreUI() {
+        m_isClaiming = false;
+        m_spinner->hide();
+        m_contentLayer->setVisible(true);
+        this->loadEvent();
     }
 
 public:
     static EventPopup* create() {
         auto ret = new EventPopup();
-        if (ret && ret->initAnchored(380.f, 280.f)) { ret->autorelease(); return ret; }
-        CC_SAFE_DELETE(ret); return nullptr;
+        if (ret && ret->initAnchored(380.f, 280.f, "geode.loader/GE_square03.png")) {
+            ret->autorelease();
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
     }
 };

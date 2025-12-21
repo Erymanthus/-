@@ -13,7 +13,6 @@ using namespace geode::prelude;
 class $modify(MyColoredCommentCell, CommentCell) {
     struct Fields {
         float m_time = 0.f;
-       
         EventListener<web::WebTask> m_mythicCheckListener;
     };
 
@@ -53,53 +52,81 @@ class $modify(MyColoredCommentCell, CommentCell) {
         }
     }
 
+   
+    bool isBadgeMythic(const std::string & badgeID) {
+        if (badgeID.empty() || badgeID == "none") return false;
+        if (auto badgeInfo = g_streakData.getBadgeInfo(badgeID)) {
+            return badgeInfo->category == StreakData::BadgeCategory::MYTHIC;
+        }
+        return false;
+    }
+
     void loadFromComment(GJComment * comment) {
         CommentCell::loadFromComment(comment);
 
-        
+       
         this->unschedule(schedule_selector(MyColoredCommentCell::updateRainbowEffect));
 
         int accountID = comment->m_accountID;
+        if (accountID <= 0) return;
 
-        
-        if (accountID > 0 && accountID == GJAccountManager::sharedState()->m_accountID) {
-            g_streakData.load();
+     
+        if (accountID == GJAccountManager::sharedState()->m_accountID) {
             if (auto* equippedBadge = g_streakData.getEquippedBadge()) {
                 if (equippedBadge->category == StreakData::BadgeCategory::MYTHIC) {
                     this->schedule(schedule_selector(MyColoredCommentCell::updateRainbowEffect));
                 }
             }
+            return;
         }
-        
-        else if (accountID > 0) {
-            
-            std::string url = fmt::format(
-                "https://streak-servidor.onrender.com/players/{}",
-                accountID
-            );
 
-            m_fields->m_mythicCheckListener.bind([this](web::WebTask::Event* e) {
-                if (web::WebResponse* res = e->getValue()) {
-                    if (res->ok() && res->json().isOk()) {
-                        auto playerData = res->json().unwrap();
-                        
-                        bool hasMythic = playerData["has_mythic_color"].as<bool>().unwrapOr(false);
-                        if (hasMythic) {
-                            
-                            this->schedule(schedule_selector(MyColoredCommentCell::updateRainbowEffect));
-                        }
+        
+        std::string cachedBadge = g_streakData.getCachedBadge(accountID);
+
+        
+        if (!cachedBadge.empty()) {
+            if (isBadgeMythic(cachedBadge)) {
+                this->schedule(schedule_selector(MyColoredCommentCell::updateRainbowEffect));
+            }
+            return;
+        }
+
+      
+        std::string url = fmt::format("https://streak-servidor.onrender.com/players/{}", accountID);
+
+        m_fields->m_mythicCheckListener.bind([this, accountID](web::WebTask::Event* e) {
+            if (web::WebResponse* res = e->getValue()) {
+                if (res->ok() && res->json().isOk()) {
+                    auto playerData = res->json().unwrap();
+
+                  
+                    std::string badgeId = playerData["equipped_badge_id"].as<std::string>().unwrapOr("");
+
+                  
+                    if (badgeId.empty()) {
+                        g_streakData.cacheUserBadge(accountID, "none");
+                    }
+                    else {
+                        g_streakData.cacheUserBadge(accountID, badgeId);
+                    }
+
+                
+                    if (this->isBadgeMythic(badgeId)) {
+                        this->schedule(schedule_selector(MyColoredCommentCell::updateRainbowEffect));
                     }
                 }
-                });
+                else if (res->code() == 404) {
+                 
+                    g_streakData.cacheUserBadge(accountID, "none");
+                }
+            }
+            });
 
-           
-            auto req = web::WebRequest();
-            m_fields->m_mythicCheckListener.setFilter(req.get(url));
-        }
+        auto req = web::WebRequest();
+        m_fields->m_mythicCheckListener.setFilter(req.get(url));
     }
 
     static void onModify(auto& self) {
         (void)self.setHookPriority("CommentCell::loadFromComment", -100);
     }
 };
-

@@ -16,5 +16,5 @@
 #include "popups/EventPopup.h"       
 #include "popups/CollectionPopups.h" 
 #include "popups/StatsPopups.h"      
-#include "popups/InfoPopup.h"        
+#include "popups/InfoPopup.h"
 

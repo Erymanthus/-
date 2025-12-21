@@ -22,7 +22,7 @@ protected:
     const float AD_DISPLAY_TIME = 4.0f;
     const float AD_SLIDE_DURATION = 0.5f; 
     const float AD_SIZE = 98.0f;
-//-- 
+//--
     CCMenuItemSpriteExtra* m_spinBtn;
     CCMenuItemSpriteExtra* m_spin10Btn;
     CCMenu* m_shopMenu = nullptr;
@@ -112,7 +112,12 @@ protected:
         m_adsClipper->addChild(m_adsContainer);
 
      
-        std::vector<std::string> images = { "publi_1.png"_spr, "publi_2.png"_spr, "publi_3.png"_spr};
+        std::vector<std::string> images = {
+            "publi_1.png"_spr,
+            "publi_2.png"_spr,
+            "publi_3.png"_spr,
+            "publi_4.png"_spr,
+            "publi_5.png"_spr};
 
         for (int i = 0; i < images.size(); i++) {
             auto spr = CCSprite::create(images[i].c_str());
@@ -194,10 +199,10 @@ protected:
        
 
         m_roulettePrizes = {
-            { RewardType::Badge, "bh_badge_7", 1, "", "Black Hole Galaxy", 1, StreakData::BadgeCategory::MYTHIC },
-            { RewardType::Badge, "gold_streak_badge", 1, "", "Gold Legend's", 3, StreakData::BadgeCategory::LEGENDARY },
+            { RewardType::Badge, "freddy_badge", 1, "", "Freddy", 1, StreakData::BadgeCategory::MYTHIC },
+            { RewardType::Badge, "past2_badge", 1, "", "Mythic Past Green", 3, StreakData::BadgeCategory::LEGENDARY },
             { RewardType::Badge, "mc_badge_2", 1, "", "full farming", 5, StreakData::BadgeCategory::EPIC },
-            { RewardType::Badge, "bh_badge_3", 1, "", "Black hole Green", 10, StreakData::BadgeCategory::SPECIAL },
+            { RewardType::Badge, "bh_badge_3", 1, "", "Black hole Green", 10, StreakData::BadgeCategory::SPECIAL},
             { RewardType::Badge, "mc_badge_3", 1, "", "break shields", 70, StreakData::BadgeCategory::COMMON },
             { RewardType::Badge, "bh_badge_4", 1, "", "Black hole blue", 70, StreakData::BadgeCategory::COMMON },
             { RewardType::StarTicket, "star_tiket_1", 1, "star_tiket.png"_spr, "1 star tiket", 70, StreakData::BadgeCategory::COMMON },
@@ -788,7 +793,7 @@ protected:
 public:
     static RoulettePopup* create() {
         auto ret = new RoulettePopup();
-        if (ret && ret->initAnchored(260.f, 260.f)) {
+        if (ret && ret->initAnchored(260.f, 260.f, "geode.loader/GE_square01.png")) {
             ret->autorelease(); 
             return ret; 
         }

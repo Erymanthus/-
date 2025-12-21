@@ -8,14 +8,16 @@ using namespace geode::prelude;
 enum class RewardType {
     Badge,
     SuperStar,
-    StarTicket
+    StarTicket,
+    Banner
 };
 
 enum class LevelRewardType {
     None,
     Badge, 
     SuperStars,
-    StarTickets
+    StarTickets,
+    Banner
 };
 
 struct RoulettePrize {
@@ -77,5 +79,10 @@ inline std::vector<LevelMission> g_levelMissions = {
     {113469866, "Skybound",            "Skybound_badge",LevelRewardType::SuperStars,     5,      "super_star.png"_spr,        "+5 Super Stars"},
     {118509879, "Skeletal Shenanigans","Skeletal_Shenanigans_badge", LevelRewardType::SuperStars, 10, "super_star.png"_spr, "+10 Super Stars"},
     {112690334, "Frostbite",           "Frostbite_badge", LevelRewardType::SuperStars,   75,      "star_tiket.png"_spr,        "+75 Star Tickets" },
-	{126765939, "GD Randomizer",      "random_badge", LevelRewardType::StarTickets, 700, "star_tiket.png"_spr, "+700 Star Tickets" }
+	{126765939, "GD Randomizer",      "random_badge", LevelRewardType::StarTickets, 700, "star_tiket.png"_spr, "+700 Star Tickets" },
+    {38637027, "Wild","tlt_badge", LevelRewardType::StarTickets, 800, "star_tiket.png"_spr, "+800 Star Tickets" },
+    {109508844, "Stargaze","ncs_badge", LevelRewardType::SuperStars, 30, "super_star.png"_spr, "+30 Super Stars" }
+  
+
+
 };

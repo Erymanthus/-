@@ -14,9 +14,11 @@ class RewardNotification : public CCNode {
 protected:
     int m_addedAmount;
     int m_startAmount;
+    int m_sessionAddedAmount; 
     float m_currentAccumulator;
 
-    CCLabelBMFont* m_label;
+    CCLabelBMFont* m_label;      
+    CCLabelBMFont* m_addedLabel;  
     cocos2d::extension::CCScale9Sprite* m_bg;
     std::string m_spriteName;
     CCPoint m_finalBGPosition;
@@ -27,6 +29,7 @@ public:
         auto scene = CCDirector::sharedDirector()->getRunningScene();
         if (!scene) return;
 
+      
         for (auto node : s_activeRewards) {
             if (node->m_spriteName == spriteName) {
                 node->addBonus(addedAmount);
@@ -49,7 +52,7 @@ public:
     static void updatePositions() {
         auto winSize = CCDirector::sharedDirector()->getWinSize();
         float startY = winSize.height - 30.f;
-        float gap = 45.f;
+        float gap = 55.f; 
 
         for (size_t i = 0; i < s_activeRewards.size(); ++i) {
             auto node = s_activeRewards[i];
@@ -70,6 +73,13 @@ public:
 
     void addBonus(int extraAmount) {
         m_targetTotal += extraAmount;
+        m_sessionAddedAmount += extraAmount;
+
+      
+        if (m_addedLabel) {
+            m_addedLabel->setString(fmt::format("+{}", m_sessionAddedAmount).c_str());
+        }
+
         this->stopActionByTag(100);
         m_bg->stopActionByTag(200);
         auto resetMove = CCEaseOut::create(CCMoveTo::create(0.2f, m_finalBGPosition), 2.0f);
@@ -93,9 +103,13 @@ protected:
     bool init(const std::string& spriteName, int startAmount, int addedAmount) {
         if (!CCNode::init()) return false;
 
+     
+        FMODAudioEngine::sharedEngine()->playEffect("claim_mission.mp3"_spr);
+
         m_spriteName = spriteName;
         m_startAmount = startAmount;
         m_addedAmount = addedAmount;
+        m_sessionAddedAmount = addedAmount;
         m_targetTotal = startAmount + addedAmount;
         m_currentAccumulator = (float)startAmount;
 
@@ -110,17 +124,25 @@ protected:
         if (!icon) icon = CCSprite::createWithSpriteFrameName(m_spriteName.c_str());
         if (icon) {
             icon->setTag(99);
-            icon->setScale(0.3f);
+            icon->setScale(0.35f);
             m_bg->addChild(icon);
         }
 
+      
         m_label = CCLabelBMFont::create(std::to_string(m_startAmount).c_str(), "goldFont.fnt");
         m_label->setScale(0.45f);
         m_bg->addChild(m_label);
+
+     
+        m_addedLabel = CCLabelBMFont::create(fmt::format("+{}", m_sessionAddedAmount).c_str(), "goldFont.fnt");
+        m_addedLabel->setScale(0.35f);
+        m_addedLabel->setColor({ 0, 255, 0 }); 
+        m_bg->addChild(m_addedLabel);
+
         this->updateBGSize();
 
         int myIndex = s_activeRewards.size();
-        float gap = 45.f;
+        float gap = 55.f;
         float startY = winSize.height - 30.f;
         float targetY = startY - (myIndex * gap) - (m_bg->getContentSize().height / 2);
 
@@ -141,15 +163,23 @@ protected:
     void updateBGSize() {
         auto icon = m_bg->getChildByTag(99);
         float iconWidth = icon ? icon->getScaledContentSize().width : 20.f;
-        float labelWidth = m_label->getScaledContentSize().width;
 
-        float bgWidth = labelWidth + iconWidth + 25.f;
-        float bgHeight = 30.f;
+     
+        float labelWidth = m_label->getScaledContentSize().width;
+        float addedWidth = m_addedLabel->getScaledContentSize().width;
+        float maxTextWidth = std::max(labelWidth, addedWidth);
+
+        float bgWidth = maxTextWidth + iconWidth + 30.f;
+        float bgHeight = 45.f;
 
         m_bg->setContentSize({ bgWidth, bgHeight });
 
-        if (icon) icon->setPosition({ 15.f, bgHeight / 2 });
-        m_label->setPosition({ bgWidth - (labelWidth / 2) - 8.f, bgHeight / 2 });
+        if (icon) icon->setPosition({ 18.f, bgHeight / 2 });
+
+      
+        m_label->setPosition({ bgWidth - (maxTextWidth / 2) - 10.f, bgHeight / 2 + 7.f });
+
+        m_addedLabel->setPosition({ bgWidth - (maxTextWidth / 2) - 10.f, bgHeight / 2 - 7.f });
     }
 
     void scheduleExit() {
@@ -170,13 +200,13 @@ protected:
     void runParticleAnimation(int amountForThisWave) {
         auto winSize = CCDirector::sharedDirector()->getWinSize();
 
-        int particleCount = std::min(amountForThisWave, 25);
-        if (particleCount < 5) particleCount = 5;
+      
+        int particleCount = amountForThisWave;
+        if (particleCount > 30) particleCount = 30;
+        if (particleCount < 1) particleCount = 1;
 
         float valPerParticle = (float)amountForThisWave / (float)particleCount;
         std::string valStr = fmt::format("{}", valPerParticle);
-
-        FMODAudioEngine::sharedEngine()->playEffect("chest02.ogg");
 
         CCPoint centerPos = this->convertToNodeSpace(winSize / 2);
 
@@ -197,7 +227,8 @@ protected:
             CCPoint explosionOffset = ccp(cosf(angle) * distance, sinf(angle) * distance);
             CCPoint popPosition = centerPos + explosionOffset;
 
-            float sequenceDelay = i * 0.08f;
+          
+            float sequenceDelay = i * 0.05f;
 
             float popTime = 0.4f;
             auto popMove = CCEaseOut::create(CCMoveTo::create(popTime, popPosition), 2.0f);
@@ -239,7 +270,7 @@ protected:
         if (displayValue > m_targetTotal) displayValue = m_targetTotal;
 
         m_label->setString(std::to_string(displayValue).c_str());
-        this->updateBGSize();
+    
 
         m_label->stopAllActions();
         m_label->setScale(0.55f);
@@ -248,7 +279,6 @@ protected:
 
     void onAnimationEnd() {
         m_label->setString(std::to_string(m_targetTotal).c_str());
-        this->updateBGSize();
 
         auto slideOff = CCEaseBackIn::create(
             CCMoveBy::create(0.5f, ccp(m_bg->getContentSize().width + 100.f, 0))
@@ -267,13 +297,14 @@ protected:
     void cleanupAndRemove() {
         auto it = std::find(s_activeRewards.begin(), s_activeRewards.end(), this);
         if (it == s_activeRewards.end()) {
-            return; 
+            return;
         }
 
-        s_activeRewards.erase(it);    
-        RewardNotification::updatePositions();      
+        s_activeRewards.erase(it);
+        RewardNotification::updatePositions();
         this->removeFromParentAndCleanup(true);
     }
 };
 
-std::vector<RewardNotification*> RewardNotification::s_activeRewards;
+
+inline std::vector<RewardNotification*> RewardNotification::s_activeRewards;

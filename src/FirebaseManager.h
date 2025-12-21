@@ -2,3 +2,4 @@
 #include <functional>
 void updatePlayerDataInFirebase();
 void loadPlayerDataFromServer();
+void completeLevelInFirebase(int stars);

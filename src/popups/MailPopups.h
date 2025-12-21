@@ -763,7 +763,7 @@ protected:
 public:
     static MailboxPopup* create() {
         auto ret = new MailboxPopup();
-        if (ret && ret->initAnchored(340.f, 220.f)) { 
+        if (ret && ret->initAnchored(340.f, 220.f, "geode.loader/GE_square01.png")) {
             ret->autorelease();
             return ret;
         }

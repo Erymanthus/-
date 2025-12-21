@@ -2,6 +2,7 @@
 #include "StreakCommon.h"
 #include "SharedVisuals.h"
 #include <Geode/ui/Popup.hpp>
+#include <Geode/ui/ScrollLayer.hpp>
 #include <Geode/binding/GameLevelManager.hpp>
 #include <Geode/binding/LevelInfoLayer.hpp>
 #include <Geode/binding/TextAlertPopup.hpp> 
@@ -10,60 +11,63 @@
 #include "../BadgeNotification.h"
 #include "../RewardNotification.h"
 
-
-
 using namespace geode::prelude;
 
 class LevelProgressPopup : public Popup<> {
 protected:
-    CCLayer* m_listContainer = nullptr;
-    CCMenuItemSpriteExtra* m_leftArrow = nullptr;
-    CCMenuItemSpriteExtra* m_rightArrow = nullptr;
-    int m_currentPage = 0;
-    int m_totalPages = 0;
-    const int m_itemsPerPage = 3;
+    ScrollLayer* m_scrollLayer = nullptr;
 
-    
+    void onViewLevel(CCObject* sender) {
+        int levelID = sender->getTag();
+        auto glm = GameLevelManager::sharedState();
+        auto level = glm->getSavedLevel(levelID);
+
+        if (!level) {
+            level = GJGameLevel::create();
+            level->m_levelID = levelID;
+            level->m_levelType = GJLevelType::Saved;
+        }
+
+        auto scene = CCScene::create();
+        auto layer = LevelInfoLayer::create(level, false);
+
+        scene->addChild(layer);
+        CCDirector::sharedDirector()->replaceScene(
+            CCTransitionFade::create(0.5f, scene)
+        );
+    }
+
     void onCopyLevelID(CCObject* sender) {
         int levelID = sender->getTag();
         geode::utils::clipboard::write(std::to_string(levelID));
         Notification::create(
             "ID Copied",
-            NotificationIcon::None, 
-            0.5f 
+            NotificationIcon::None,
+            0.5f
         )->show();
-
         FMODAudioEngine::sharedEngine()->playEffect("playSound_001.ogg"_spr);
-    }
-
-    void onViewLevel(CCObject* sender) {
-        int levelID = sender->getTag();
-        auto level = GameLevelManager::sharedState()->getSavedLevel(levelID);
-        if (!level) {
-            level = GJGameLevel::create();
-            level->m_levelID = levelID;
-        }
-        auto scene = CCScene::create();
-        auto layer = LevelInfoLayer::create(level, false);
-        scene->addChild(layer);
-        CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f, scene));
     }
 
     void onMissionInfo(CCObject*) {
         FLAlertLayer::create(
             "Info",
             "Complete levels to unlock rewards.\nLevels show your current % progress.",
-            "OK")->show();
+            "OK"
+        )->show();
     }
 
     void setupProgressBar() {
         auto winSize = m_mainLayer->getContentSize();
-        if (auto oldBar = m_mainLayer->getChildByTag(999)) oldBar->removeFromParent();
+        if (auto oldBar = m_mainLayer->getChildByTag(999)) {
+            oldBar->removeFromParent();
+        }
 
         int total = g_levelMissions.size();
         int claimed = 0;
         for (const auto& m : g_levelMissions) {
-            if (g_streakData.isLevelMissionClaimed(m.levelID)) claimed++;
+            if (g_streakData.isLevelMissionClaimed(m.levelID)) {
+                claimed++;
+            }
         }
         float percent = total > 0 ? (float)claimed / (float)total : 0.f;
 
@@ -72,30 +76,51 @@ protected:
         float barWidth = 260.f;
         float barHeight = 10.f;
 
-        auto outer = CCLayerColor::create({ 0, 0, 0, 70 }, barWidth + 6, barHeight + 6);
+        auto outer = CCLayerColor::create(
+            { 0, 0, 0, 70 },
+            barWidth + 6,
+            barHeight + 6
+        );
         outer->setPosition({ -(barWidth / 2) - 3, -(barHeight / 2) - 3 });
         barNode->addChild(outer);
 
-        auto border = CCLayerColor::create({ 255, 255, 255, 120 }, barWidth + 2, barHeight + 2);
+        auto border = CCLayerColor::create(
+            { 255, 255, 255, 120 },
+            barWidth + 2,
+            barHeight + 2
+        );
         border->setPosition({ -(barWidth / 2) - 1, -(barHeight / 2) - 1 });
         barNode->addChild(border);
 
-        auto barBg = CCLayerColor::create({ 45, 45, 45, 255 }, barWidth, barHeight);
+        auto barBg = CCLayerColor::create(
+            { 45, 45, 45, 255 },
+            barWidth,
+            barHeight
+        );
         barBg->setPosition({ -(barWidth / 2), -(barHeight / 2) });
         barNode->addChild(barBg);
 
-        auto barFill = CCLayerGradient::create({ 0, 255, 255, 255 }, { 0, 100, 200, 255 });
+        auto barFill = CCLayerGradient::create(
+            { 0, 255, 255, 255 },
+            { 0, 100, 200, 255 }
+        );
         barFill->setContentSize({ barWidth * percent, barHeight });
         barFill->setVector({ 1, 0 });
         barFill->setPosition({ -(barWidth / 2), -(barHeight / 2) });
         barNode->addChild(barFill);
 
         int percentInt = static_cast<int>(percent * 100);
-        auto percentLabel = CCLabelBMFont::create(fmt::format("{}%", percentInt).c_str(), "bigFont.fnt");
+        auto percentLabel = CCLabelBMFont::create(
+            fmt::format("{}%", percentInt).c_str(),
+            "bigFont.fnt"
+        );
         percentLabel->setScale(0.35f);
         percentLabel->setPosition({ 0, 2.0f });
 
-        auto shadow = CCLabelBMFont::create(fmt::format("{}%", percentInt).c_str(), "bigFont.fnt");
+        auto shadow = CCLabelBMFont::create(
+            fmt::format("{}%", percentInt).c_str(),
+            "bigFont.fnt"
+        );
         shadow->setScale(0.35f);
         shadow->setColor({ 0,0,0 });
         shadow->setOpacity(150);
@@ -104,12 +129,16 @@ protected:
         barNode->addChild(shadow, 6);
         barNode->addChild(percentLabel, 7);
 
-        auto countLabel = CCLabelBMFont::create(fmt::format("{}/{}", claimed, total).c_str(), "goldFont.fnt");
+        auto countLabel = CCLabelBMFont::create(
+            fmt::format("{}/{}", claimed, total).c_str(),
+            "goldFont.fnt"
+        );
         countLabel->setScale(0.45f);
-        countLabel->setPosition({ 0, 17.f });
+        countLabel->setPosition({ 0, -15.f });
+
         barNode->addChild(countLabel);
 
-        barNode->setPosition({ winSize.width / 2, 25.f });
+        barNode->setPosition({ winSize.width / 2, winSize.height - 40.f });
         m_mainLayer->addChild(barNode);
     }
 
@@ -124,8 +153,11 @@ protected:
 
         auto badgeInfo = g_streakData.getBadgeInfo(mission.rewardBadgeID);
         ccColor3B titleColor = badgeInfo ? g_streakData.getCategoryColor(badgeInfo->category) : ccColor3B{ 255, 255, 255 };
-        
-        auto nameLabel = CCLabelBMFont::create(mission.levelName.c_str(), "goldFont.fnt");
+
+        auto nameLabel = CCLabelBMFont::create(
+            mission.levelName.c_str(),
+            "goldFont.fnt"
+        );
         nameLabel->limitLabelWidth(130.f, 0.6f, 0.1f);
         nameLabel->setAnchorPoint({ 0, 0.5f });
         nameLabel->setPosition({ 12.f, 41.f });
@@ -136,7 +168,10 @@ protected:
         btnMenu->setPosition({ 0, 0 });
         container->addChild(btnMenu);
 
-        auto idLabel = CCLabelBMFont::create(fmt::format("ID: {}", mission.levelID).c_str(), "chatFont.fnt");
+        auto idLabel = CCLabelBMFont::create(
+            fmt::format("ID: {}", mission.levelID).c_str(),
+            "chatFont.fnt"
+        );
         idLabel->setScale(0.4f);
         idLabel->setColor({ 180, 180, 180 });
         idLabel->setOpacity(200);
@@ -146,12 +181,10 @@ protected:
             this,
             menu_selector(LevelProgressPopup::onCopyLevelID)
         );
-
         idBtn->setTag(mission.levelID);
 
         float idBtnWidth = idLabel->getScaledContentSize().width;
         idBtn->setPosition({ 12.f + (idBtnWidth / 2), 28.f });
-
         btnMenu->addChild(idBtn);
 
         float lvlBarWidth = 100.f;
@@ -160,68 +193,58 @@ protected:
 
         auto lvlOuter = CCLayerColor::create(
             { 0, 0, 0, 100 },
-            lvlBarWidth + 2, lvlBarHeight + 2
+            lvlBarWidth + 2,
+            lvlBarHeight + 2
         );
-
-        lvlOuter->setPosition(
-            { 12.f - 1.f, 12.f - 1.f }
-        );
-
+        lvlOuter->setPosition({ 12.f - 1.f, 12.f - 1.f });
         container->addChild(lvlOuter);
 
         auto lvlBorder = CCLayerColor::create(
-            { 255, 255, 255, 100 }, 
-            lvlBarWidth + 1, 
+            { 255, 255, 255, 100 },
+            lvlBarWidth + 1,
             lvlBarHeight + 1
         );
-
-        lvlBorder->setPosition(
-            { 12.f - 0.5f, 12.f - 0.5f }
-        );
-
+        lvlBorder->setPosition({ 12.f - 0.5f, 12.f - 0.5f });
         container->addChild(lvlBorder);
 
         auto lvlBarBg = CCLayerColor::create(
             { 40, 40, 40, 255 },
             lvlBarWidth,
-            lvlBarHeight);
-
+            lvlBarHeight
+        );
         lvlBarBg->setPosition({ 12.f, 12.f });
         container->addChild(lvlBarBg);
 
         ccColor4B startColor = (percentDecimal >= 1.f) ? ccColor4B{ 0, 255, 0, 255 } : ccColor4B{ 255, 200, 0, 255 };
         ccColor4B endColor = (percentDecimal >= 1.f) ? ccColor4B{ 0, 180, 0, 255 } : ccColor4B{ 255, 120, 0, 255 };
-        auto lvlBarFill = CCLayerGradient::create(startColor, endColor);
-        lvlBarFill->setContentSize({ 
-            lvlBarWidth * percentDecimal,
-            lvlBarHeight }
-        );
 
+        auto lvlBarFill = CCLayerGradient::create(startColor, endColor);
+        lvlBarFill->setContentSize({ lvlBarWidth * percentDecimal, lvlBarHeight });
         lvlBarFill->setVector({ 1, 0 });
         lvlBarFill->setPosition({ 12.f, 12.f });
         container->addChild(lvlBarFill);
 
-        auto percentTxt = CCLabelBMFont::create(fmt::format("{}%", normalPercent).c_str(), "chatFont.fnt");
+        auto percentTxt = CCLabelBMFont::create(
+            fmt::format("{}%", normalPercent).c_str(),
+            "chatFont.fnt"
+        );
         percentTxt->setScale(0.3f);
         percentTxt->setPosition({ 12.f + lvlBarWidth + 15.f, 14.5f });
         container->addChild(percentTxt);
 
- 
         auto rewardNode = RewardCycleNode::create(40.f, 40.f);
         if (rewardNode) {
             rewardNode->setPosition({ 210.f, 27.5f });
             container->addChild(rewardNode);
-            if (badgeInfo) rewardNode->addReward(
-                badgeInfo->spriteName,
-                "Badge",
-                0.18f
-            );
+            if (badgeInfo) {
+                rewardNode->addReward(badgeInfo->spriteName, "Badge", 0.18f);
+            }
 
             if (mission.secondaryRewardType != LevelRewardType::None) {
-                rewardNode->addReward(mission.secondaryRewardSprite,
-                fmt::format("x{}",
-                mission.secondaryRewardQuantity),
-                0.20f
+                rewardNode->addReward(
+                    mission.secondaryRewardSprite,
+                    fmt::format("x{}", mission.secondaryRewardQuantity),
+                    0.20f
                 );
             }
         }
@@ -236,7 +259,6 @@ protected:
             this,
             menu_selector(LevelProgressPopup::onViewLevel)
         );
-
         viewBtn->setTag(mission.levelID);
         viewBtn->setPosition({ buttonsX, 38.f });
         btnMenu->addChild(viewBtn);
@@ -250,29 +272,24 @@ protected:
         }
         else if (isComplete) {
             auto claimBtnSprite = ButtonSprite::create(
-                "Claim",
-                0,
-                0,
-                "goldFont.fnt",
-                "GJ_button_01.png",
-                0,
-                0.5f
+                "Claim", 0, 0, "goldFont.fnt", "GJ_button_01.png", 0, 0.5f
             );
-
             claimBtnSprite->setScale(0.7f);
+
             auto claimBtn = CCMenuItemSpriteExtra::create(
-                claimBtnSprite, 
+                claimBtnSprite,
                 this,
                 menu_selector(LevelProgressPopup::onClaimMission)
             );
-
             claimBtn->setTag(mission.levelID);
             claimBtn->setPosition({ buttonsX, statusY });
             btnMenu->addChild(claimBtn);
         }
         else {
             auto lockIcon = CCSprite::createWithSpriteFrameName("GJ_lockGray_001.png");
-            if (!lockIcon) lockIcon = CCSprite::createWithSpriteFrameName("GJ_lock_001.png");
+            if (!lockIcon) {
+                lockIcon = CCSprite::createWithSpriteFrameName("GJ_lock_001.png");
+            }
             lockIcon->setScale(0.5f);
             lockIcon->setPosition({ buttonsX, statusY });
             container->addChild(lockIcon);
@@ -280,35 +297,32 @@ protected:
         return container;
     }
 
-    void updatePage() {
-        m_listContainer->removeAllChildrenWithCleanup(true);
-        int startIndex = m_currentPage * m_itemsPerPage;
-        float containerWidth = m_listContainer->getContentSize().width;
-        float itemHeight = 55.f;
-        float gap = 8.f;
-        float startY = (m_listContainer->getContentSize().height / 2) + ((m_itemsPerPage * itemHeight + (m_itemsPerPage - 1) * gap) / 2) - (itemHeight / 2);
+    void loadList() {
+        if (!m_scrollLayer) return;
 
-        for (int i = 0; i < m_itemsPerPage; ++i) {
-            int missionIndex = startIndex + i;
-            if (missionIndex < g_levelMissions.size()) {
-                if (auto missionNode = createLevelMissionNode(g_levelMissions[missionIndex])) {
-                    missionNode->setPosition(containerWidth / 2, startY - (i * (itemHeight + gap)));
-                    m_listContainer->addChild(missionNode);
-                }
+        auto content = CCMenu::create();
+        content->setPosition({ 0, 0 });
+
+        float itemHeight = 60.f;
+        float totalHeight = g_levelMissions.size() * itemHeight;
+
+        if (totalHeight < m_scrollLayer->getContentSize().height) {
+            totalHeight = m_scrollLayer->getContentSize().height;
+        }
+
+        content->setContentSize({ m_scrollLayer->getContentSize().width, totalHeight });
+
+        for (size_t i = 0; i < g_levelMissions.size(); ++i) {
+            if (auto cell = createLevelMissionNode(g_levelMissions[i])) {
+                float yPos = totalHeight - (i * itemHeight) - (itemHeight / 2);
+                cell->setPosition({ m_scrollLayer->getContentSize().width / 2, yPos });
+                content->addChild(cell);
             }
         }
-        m_leftArrow->setVisible(m_currentPage > 0);
-        m_rightArrow->setVisible(m_currentPage < m_totalPages - 1);
-        this->setTitle(fmt::format("Level Challenges ({}/{})", m_currentPage + 1, m_totalPages).c_str());
-    }
 
-    void onSwitchPage(CCObject* sender) {
-        int direction = sender->getTag();
-        int nextPage = m_currentPage + direction;
-        if (nextPage >= 0 && nextPage < m_totalPages) {
-            m_currentPage = nextPage;
-            updatePage();
-        }
+        m_scrollLayer->m_contentLayer->addChild(content);
+        m_scrollLayer->m_contentLayer->setContentSize(content->getContentSize());
+        m_scrollLayer->moveToTop();
     }
 
     void onClaimMission(CCObject* sender) {
@@ -316,16 +330,15 @@ protected:
         if (g_streakData.isLevelMissionClaimed(levelID)) return;
 
         const LevelMission* missionPtr = nullptr;
-        for (const auto& m : g_levelMissions) { 
-            if (m.levelID == levelID) { 
+        for (const auto& m : g_levelMissions) {
+            if (m.levelID == levelID) {
                 missionPtr = &m;
                 break;
-            } 
+            }
         }
 
         if (missionPtr) {
             g_streakData.completedLevelMissions.insert(levelID);
-
 
             if (!missionPtr->rewardBadgeID.empty()) {
                 bool alreadyHadBadge = g_streakData.isBadgeUnlocked(missionPtr->rewardBadgeID);
@@ -335,12 +348,9 @@ protected:
                 }
             }
 
-      
-
             if (missionPtr->secondaryRewardType == LevelRewardType::SuperStars) {
                 int start = g_streakData.superStars;
                 g_streakData.superStars += missionPtr->secondaryRewardQuantity;
-
                 RewardNotification::show(
                     "super_star.png"_spr,
                     start,
@@ -348,93 +358,55 @@ protected:
                 );
             }
 
-         
             if (missionPtr->secondaryRewardType == LevelRewardType::StarTickets) {
                 int start = g_streakData.starTickets;
                 g_streakData.starTickets += missionPtr->secondaryRewardQuantity;
-
                 RewardNotification::show(
-                    "star_tiket.png"_spr, 
+                    "star_tiket.png"_spr,
                     start,
                     missionPtr->secondaryRewardQuantity
                 );
             }
-
             g_streakData.save();
         }
-        updatePage();
+
+        if (m_scrollLayer) {
+            m_scrollLayer->m_contentLayer->removeAllChildren();
+        }
+        loadList();
         setupProgressBar();
     }
 
     bool setup() override {
         this->setTitle("Level Challenges");
         auto winSize = m_mainLayer->getContentSize();
-        m_totalPages = static_cast<int>(ceil(static_cast<float>(g_levelMissions.size()) / m_itemsPerPage));
-        if (m_totalPages == 0) m_totalPages = 1;
 
         auto background = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
         background->setColor({ 0, 0, 0 });
         background->setOpacity(100);
         background->setContentSize({ 320.f, 185.f });
-        background->setPosition({
-            winSize.width / 2, 
-            winSize.height / 2 + 10.f
-            });
-
+        background->setPosition({ winSize.width / 2, winSize.height / 2 - 15.f });
         m_mainLayer->addChild(background);
 
-        m_listContainer = CCLayer::create();
-        m_listContainer->setContentSize(background->getContentSize());
-        m_listContainer->setPosition(background->getPosition() - background->getContentSize() / 2);
-        m_mainLayer->addChild(m_listContainer);
-
-        auto leftSpr = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png");
-        m_leftArrow = CCMenuItemSpriteExtra::create(
-            leftSpr,
-            this,
-            menu_selector(LevelProgressPopup::onSwitchPage)
+        m_scrollLayer = ScrollLayer::create(background->getContentSize());
+        m_scrollLayer->setPosition(
+            background->getPosition() - background->getContentSize() / 2
         );
-
-        m_leftArrow->setTag(-1);
-
-        auto rightSpr = CCSprite::createWithSpriteFrameName("GJ_arrow_03_001.png");
-        rightSpr->setFlipX(true);
-        m_rightArrow = CCMenuItemSpriteExtra::create(
-            rightSpr,
-            this,
-            menu_selector(LevelProgressPopup::onSwitchPage)
-        );
-
-        m_rightArrow->setTag(1);
-
-        auto arrowMenu = CCMenu::create();
-        arrowMenu->addChild(m_leftArrow);
-        arrowMenu->addChild(m_rightArrow);
-        arrowMenu->alignItemsHorizontallyWithPadding(320.f + 15.f);
-        arrowMenu->setPosition({ 
-            winSize.width / 2,
-            winSize.height / 2 + 10.f
-            });
-
-        m_mainLayer->addChild(arrowMenu);
+        m_mainLayer->addChild(m_scrollLayer);
 
         auto infoIcon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png");
         infoIcon->setScale(0.7f);
         auto infoBtn = CCMenuItemSpriteExtra::create(
             infoIcon,
-            this, 
+            this,
             menu_selector(LevelProgressPopup::onMissionInfo)
         );
 
         auto infoMenu = CCMenu::createWithItem(infoBtn);
-        infoMenu->setPosition({
-            winSize.width - 25.f, 
-            winSize.height - 25.f
-            });
-
+        infoMenu->setPosition({ winSize.width - 25.f, winSize.height - 25.f });
         m_mainLayer->addChild(infoMenu);
 
-        updatePage();
+        loadList();
         setupProgressBar();
         return true;
     }
@@ -442,7 +414,7 @@ protected:
 public:
     static LevelProgressPopup* create() {
         auto ret = new LevelProgressPopup();
-        if (ret && ret->initAnchored(360.f, 270.f)) {
+        if (ret && ret->initAnchored(360.f, 270.f, "geode.loader/GE_square03.png")) {
             ret->autorelease();
             return ret;
         }

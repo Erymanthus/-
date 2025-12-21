@@ -16,7 +16,7 @@
 #include <Geode/utils/cocos.hpp>
 #include <Geode/modify/OptionsLayer.hpp>
 #include <Geode/ui/Notification.hpp> 
-
+#include "WelcomeNotification.h"
 
 class $modify(MyPlayLayer, PlayLayer) {
     void levelComplete() {
@@ -69,10 +69,10 @@ class $modify(MyMenuLayer, MenuLayer) {
     };
 
     enum class ButtonState { Loading, Active, Error };
+
     bool init() {
         if (!MenuLayer::init()) return false;
 
-       
         this->createStreakButton(ButtonState::Loading);
         this->loadPlayerData();
 
@@ -87,7 +87,6 @@ class $modify(MyMenuLayer, MenuLayer) {
             return;
         }
 
-        
         this->createStreakButton(ButtonState::Loading);
         this->loadPlayerData();
     }
@@ -149,7 +148,6 @@ class $modify(MyMenuLayer, MenuLayer) {
         g_streakData.isDataLoaded = false;
         g_streakData.m_initialized = false;
 
-       
         this->createStreakButton(ButtonState::Error);
 
         if (!m_fields->m_isReconnecting) {
@@ -165,41 +163,81 @@ class $modify(MyMenuLayer, MenuLayer) {
 
         CCSprite* icon = nullptr;
         CircleBaseColor color = CircleBaseColor::Gray;
+        bool shouldRotate = false;
 
         switch (state) {
         case ButtonState::Loading:
-            icon = CCSprite::createWithSpriteFrameName("GJ_updateBtn_001.png");
+       
+            icon = CCSprite::create("loading.gif"_spr);
+
+            if (icon) {
+                shouldRotate = false;
+            }
+            else {
+               
+                icon = CCSprite::createWithSpriteFrameName("GJ_updateBtn_001.png");
+                shouldRotate = true;
+            }
+
+            color = CircleBaseColor::Gray;
             break;
 
         case ButtonState::Error:
-            icon = CCSprite::createWithSpriteFrameName("exMark_001.png");
+            icon = CCSprite::create("error_face.png"_spr);
+            if (!icon) icon = CCSprite::createWithSpriteFrameName("exMark_001.png");
+
+            shouldRotate = false;
+            color = CircleBaseColor::Gray;
             break;
 
         case ButtonState::Active:
             std::string spriteName = g_streakData.getRachaSprite();
             if (!spriteName.empty()) icon = CCSprite::create(spriteName.c_str());
             if (!icon) icon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png");
+
+            shouldRotate = false;
             color = CircleBaseColor::Green;
             break;
         }
 
         if (!icon) return;
-        icon->setScale(0.5f);
+
+      
+        if (state == ButtonState::Loading) {
+            icon->setScale(1.0f);
+        }
+        else if (state == ButtonState::Error) {
+            icon->setScale(0.8f);
+        }
+        else {
+            icon->setScale(0.5f);
+        }
+
         auto circle = CircleButtonSprite::create(icon, color, CircleBaseSize::Medium);
 
-        if (state == ButtonState::Loading) {
+       
+        if (shouldRotate) {
             icon->runAction(CCRepeatForever::create(CCRotateBy::create(1.0f, 360.f)));
         }
 
+       
         if (state == ButtonState::Active) {
             int requiredPoints = g_streakData.getRequiredPoints();
             if (requiredPoints > 0 && g_streakData.streakPointsToday < requiredPoints) {
                 auto alertSprite = CCSprite::createWithSpriteFrameName("exMark_001.png");
                 if (alertSprite) {
-                    alertSprite->setScale(0.4f);
-                    alertSprite->setPosition({ circle->getContentSize().width - 12, circle->getContentSize().height - 12 });
+                    alertSprite->setScale(0.5f);
+                    alertSprite->setPosition({ circle->getContentSize().width - 10.f,
+                    circle->getContentSize().height - 10.f
+                        }
+                    );
+
                     alertSprite->setZOrder(10);
-                    alertSprite->runAction(CCRepeatForever::create(CCBlink::create(2.0f, 3)));
+
+                    auto tintRed = CCTintTo::create(0.5f, 255, 100, 100);
+                    auto tintNormal = CCTintTo::create(0.5f, 255, 255, 255);
+                    alertSprite->runAction(CCRepeatForever::create(CCSequence::create(tintRed, tintNormal, nullptr)));
+
                     circle->addChild(alertSprite);
                 }
             }
@@ -214,7 +252,7 @@ class $modify(MyMenuLayer, MenuLayer) {
 
         if (state == ButtonState::Loading) {
             btn->setEnabled(false);
-            btn->setOpacity(150);
+            btn->setOpacity(255);
         }
 
         menu->addChild(btn);
@@ -223,13 +261,19 @@ class $modify(MyMenuLayer, MenuLayer) {
 
     void onErrorButtonClick(CCObject*) {
         if (g_streakData.isBanned) {
-            createQuickPopup("ACCOUNT BANNED", "You have been <cr>BANNED</c> from Streak Mod.\nReason: <cy>" + g_streakData.banReason + "</c>", "OK", "Discord", [](FLAlertLayer*, bool btn2) {
+            createQuickPopup("ACCOUNT BANNED",
+                "You have been <cr>BANNED</c> from Streak Mod.\nReason: <cy>" + g_streakData.banReason + "</c>",
+                "OK", "Discord",
+                [](FLAlertLayer*,
+                bool btn2) {
                 if (btn2) cocos2d::CCApplication::sharedApplication()->openURL("https://discord.gg/vEPWBuFEn5");
                 }
             );
             return;
         }
-        FLAlertLayer::create("Connection Failed", "<cr>Internet connection required.</c>\nRetrying in background...", "OK")->show();
+        FLAlertLayer::create("Connection Failed", 
+            "<cr>Internet connection required.</c>\nRetrying in background...",
+            "OK")->show();
     }
 
     void onOpenPopup(CCObject * sender) {
@@ -267,8 +311,10 @@ class $modify(MyCommentCell, CommentCell) {
         }
     }
 
-    void loadFromComment(GJComment * p0) {
+    void loadFromComment(GJComment* p0) {
         CommentCell::loadFromComment(p0);
+
+     
         if (p0->m_accountID == GJAccountManager::get()->get()->m_accountID) {
             if (auto username_menu = m_mainLayer->getChildByIDRecursive("username-menu")) {
                 auto equippedBadge = g_streakData.getEquippedBadge();
@@ -286,40 +332,83 @@ class $modify(MyCommentCell, CommentCell) {
                     }
                 }
             }
+            return;
         }
-        else {
-            std::string url = fmt::format("https://streak-servidor.onrender.com/players/{}", p0->m_accountID);
-            m_fields->m_badgeListener.bind([this, p0](web::WebTask::Event* e) {
-                if (web::WebResponse* res = e->getValue()) {
-                    if (res->ok() && res->json().isOk()) {
-                        auto playerData = res->json().unwrap();
-                        if (auto badgeIdResult = playerData["equipped_badge_id"].as<std::string>()) {
-                            std::string badgeId = badgeIdResult.unwrap();
-                            if (!badgeId.empty()) {
-                                auto badgeInfo = g_streakData.getBadgeInfo(badgeId);
-                                if (badgeInfo) {
-                                    if (auto username_menu = m_mainLayer->getChildByIDRecursive("username-menu")) {
-                                        auto badgeSprite = CCSprite::create(badgeInfo->spriteName.c_str());
-                                        badgeSprite->setScale(0.15f);
-                                        auto badgeButton = CCMenuItemSpriteExtra::create(
-                                            badgeSprite, this, menu_selector(MyCommentCell::onBadgeInfoClick)
-                                        );
-                                        badgeButton->setUserObject("badge"_spr, CCString::create(badgeInfo->badgeID));
-                                        username_menu->addChild(badgeButton);
-                                        username_menu->updateLayout();
-                                    }
+
+        
+        std::string cachedBadge = g_streakData.getCachedBadge(p0->m_accountID);
+
+        
+        if (!cachedBadge.empty()) {
+            if (cachedBadge == "none") return;
+
+            if (auto username_menu = m_mainLayer->getChildByIDRecursive("username-menu")) {
+                if (auto badgeInfo = g_streakData.getBadgeInfo(cachedBadge)) {
+                    auto badgeSprite = CCSprite::create(badgeInfo->spriteName.c_str());
+                    if (badgeSprite) {
+                        badgeSprite->setScale(0.15f);
+                        auto badgeButton = CCMenuItemSpriteExtra::create(
+                            badgeSprite, this, menu_selector(MyCommentCell::onBadgeInfoClick)
+                        );
+                        badgeButton->setUserObject("badge"_spr, CCString::create(badgeInfo->badgeID));
+                        username_menu->addChild(badgeButton);
+                        username_menu->updateLayout();
+                    }
+                }
+            }
+            return;
+        }
+
+      
+        std::string url = fmt::format("https://streak-servidor.onrender.com/players/{}", p0->m_accountID);
+
+        m_fields->m_badgeListener.bind([this, p0](web::WebTask::Event* e) {
+            if (web::WebResponse* res = e->getValue()) {
+                if (res->ok() && res->json().isOk()) {
+                    auto playerData = res->json().unwrap();
+                    std::string badgeId = playerData["equipped_badge_id"].as<std::string>().unwrapOr("");
+
+                    
+                    if (badgeId.empty()) {
+                        g_streakData.cacheUserBadge(p0->m_accountID, "none");
+                    }
+                    else {
+                        g_streakData.cacheUserBadge(p0->m_accountID, badgeId);
+                    }
+
+                 
+                    if (!badgeId.empty()) {
+                        if (auto badgeInfo = g_streakData.getBadgeInfo(badgeId)) {
+                            if (auto username_menu = m_mainLayer->getChildByIDRecursive("username-menu")) {
+                            
+                                if (username_menu->getChildByID("streak-badge-dynamic"_spr)) return;
+
+                                auto badgeSprite = CCSprite::create(badgeInfo->spriteName.c_str());
+                                if (badgeSprite) {
+                                    badgeSprite->setScale(0.15f);
+                                    auto badgeButton = CCMenuItemSpriteExtra::create(
+                                        badgeSprite, this, menu_selector(MyCommentCell::onBadgeInfoClick)
+                                    );
+                                    badgeButton->setUserObject("badge"_spr, CCString::create(badgeInfo->badgeID));
+                                    badgeButton->setID("streak-badge-dynamic"_spr);
+                                    username_menu->addChild(badgeButton);
+                                    username_menu->updateLayout();
                                 }
                             }
                         }
-                        else {
-                            log::debug("Player {} (commenter) has no badge: {}", p0->m_accountID, badgeIdResult.unwrapErr());
-                        }
                     }
                 }
-                });
-            auto req = web::WebRequest();
-            m_fields->m_badgeListener.setFilter(req.get(url));
-        }
+                else {
+                 
+                    if (res->code() == 404) {
+                        g_streakData.cacheUserBadge(p0->m_accountID, "none");
+                    }
+                }
+            }
+            });
+
+        auto req = web::WebRequest();
+        m_fields->m_badgeListener.setFilter(req.get(url));
     }
 };
 
@@ -360,14 +449,16 @@ class $modify(MyPauseLayer, PauseLayer) {
             pointCounterNode->addChild(pointIcon);
 
             pointCounterNode->setContentSize({
-                pointLabel->getScaledContentSize().width + pointIcon->getScaledContentSize().width + 5, pointLabel->getScaledContentSize().height 
+                pointLabel->getScaledContentSize().width + pointIcon->getScaledContentSize().width + 5,
+                pointLabel->getScaledContentSize().height 
                 }
             );
 
             pointLabel->setPosition({ -pointIcon->getScaledContentSize().width / 2, 0 });
             pointIcon->setPosition({ pointLabel->getScaledContentSize().width / 2 + 5, 0 });
             streakNode->setPosition({
-                winSize.width * static_cast<float>(posX), winSize.height * static_cast<float>(posY)
+                winSize.width * static_cast<float>(posX),
+                winSize.height * static_cast<float>(posY)
                 }
             );
             this->addChild(streakNode);

@@ -2,96 +2,257 @@
 #include "StreakCommon.h"
 #include "../StreakData.h"
 #include <Geode/ui/Popup.hpp>
+#include <Geode/binding/SimplePlayer.hpp>
+#include <Geode/binding/GameManager.hpp>
+#include <Geode/ui/ScrollLayer.hpp>
 
+
+using namespace geode::prelude;
 
 class DonationPopup : public Popup<> {
 protected:
+  
     void onConfirmKofi(bool btn2) {
         if (btn2) cocos2d::CCApplication::sharedApplication()->openURL("https://ko-fi.com/streakservers");
     }
 
     void onGoToKofi(CCObject*) {
-        createQuickPopup(
-            "Wait!",
-            "Please read the steps (<cb>click the info icon</c>) <cr>before</c> donating.", 
+        createQuickPopup("Wait!",
+            "Please read the steps (<cb>click the info icon</c>) <cr>before</c> donating.",
             "Cancel",
-            "Continue to Ko-fi",
-            [this](FLAlertLayer*,
-                bool btn2) { 
-                    this->onConfirmKofi(btn2);
-            }
-        );
+            "Continue",
+            [this](FLAlertLayer*, bool btn2) { 
+                this->onConfirmKofi(btn2); 
+            });
     }
+
     void onOpenDiscordInfo(CCObject*) {
-        createQuickPopup(
-            "How to Claim Rewards",
+        createQuickPopup("How to Claim",
             "Join Discord and <cy>open a ticket</c>.\n\n<cy>Discord Link:</c>\n<cg>https://discord.gg/vEPWBuFEn5</c>",
             "OK",
             "Join Discord",
-            [](FLAlertLayer*,
-                bool btn2) { 
-                    if (btn2) cocos2d::CCApplication::sharedApplication()->openURL("https://discord.gg/vEPWBuFEn5");
-            }
-        );
+            [](FLAlertLayer*, bool btn2) {
+                if (btn2) cocos2d::CCApplication::sharedApplication()->openURL("https://discord.gg/vEPWBuFEn5");
+            });
     }
-    bool setup() override {
-        this->setTitle("Support the Mod");
-        auto winSize = this->m_mainLayer->getContentSize();
-        auto banner = CCSprite::create("support_banner.png"_spr);
-        if (banner) {
-            banner->setPosition({
-                winSize.width / 2, winSize.height / 2 + 15.f
-                }
-            );
-            banner->setScale(0.7f); m_mainLayer->addChild(banner); 
+
+     
+
+    CCAction* createRainbowAction(float speed) {
+        auto sequence = CCSequence::create(
+            CCTintTo::create(speed, 255, 0, 0),    
+            CCTintTo::create(speed, 255, 255, 0),  
+            CCTintTo::create(speed, 0, 255, 0),    
+            CCTintTo::create(speed, 0, 255, 255),  
+            CCTintTo::create(speed, 0, 0, 255),    
+            CCTintTo::create(speed, 255, 0, 255), 
+            nullptr
+        );
+        return CCRepeatForever::create(sequence);
+    }
+
+    
+    CCAction* createPulseAction(float duration, float scaleBase) {
+        float scaleMin = scaleBase * 0.9f;
+        float scaleMax = scaleBase * 1.1f;
+
+        auto scaleUp = CCScaleTo::create(duration, scaleMax);
+        auto scaleDown = CCScaleTo::create(duration, scaleMin);
+        auto sequence = CCSequence::create(scaleUp, scaleDown, nullptr);
+
+        return CCRepeatForever::create(sequence);
+    }
+
+    CCSprite* loadSpriteSafe(const char* name, const char* fallback) {
+        auto sprite = CCSprite::create(name);
+        if (!sprite) sprite = CCSprite::createWithSpriteFrameName(fallback);
+        if (!sprite) sprite = CCSprite::create(fallback);
+        if (!sprite) sprite = CCSprite::create("GJ_button_01.png");
+        return sprite;
+    }
+
+   
+    void runWaveAnimation(CCNode* labelNode) {
+        auto label = static_cast<CCLabelBMFont*>(labelNode);
+        if (!label) return;
+
+        auto children = label->getChildren();
+        if (!children) return;
+
+        float delayPerChar = 0.05f;
+        float jumpHeight = 10.0f;
+        float jumpDuration = 0.2f;
+
+        for (int i = 0; i < children->count(); ++i) {
+            auto charNode = static_cast<CCNode*>(children->objectAtIndex(i));
+            if (charNode) {
+                charNode->stopAllActions();
+                auto sequence = CCSequence::create(
+                    CCDelayTime::create(i * delayPerChar),
+                    CCMoveBy::create(jumpDuration, { 0, jumpHeight }),
+                    CCMoveBy::create(jumpDuration, { 0, -jumpHeight }),
+                    nullptr
+                );
+                charNode->runAction(sequence);
+            }
         }
+    }
+
+   
+    bool setup() override {
+        auto winSize = m_mainLayer->getContentSize();
+        this->setTitle("Support the Mod");
+        auto gm = GameManager::sharedState();
+
+         
+        auto floor = CCSprite::createWithSpriteFrameName("floorLine_01_001.png");
+        floor->setPosition({ winSize.width / 2, winSize.height / 2 + 25.f });
+        floor->setScaleX(0.8f);
+        floor->setOpacity(200);
+        m_mainLayer->addChild(floor);
+
+        
+        auto player = SimplePlayer::create(gm->getPlayerFrame());
+        player->updatePlayerFrame(gm->getPlayerFrame(), IconType::Cube);
+        player->setColor(gm->colorForIdx(gm->getPlayerColor()));
+        player->setSecondColor(gm->colorForIdx(gm->getPlayerColor2()));
+        if (gm->getPlayerGlow()) player->setGlowOutline(gm->colorForIdx(gm->getPlayerGlowColor()));
+
+        float groundY = floor->getPositionY() + 18.f;
+        float startY = winSize.height + 50.f;
+
+        player->setPosition({ winSize.width / 2, startY });
+        player->setScale(1.1f);
+        m_mainLayer->addChild(player, 5);
+
+        auto fallAction = CCMoveTo::create(1.0f, { winSize.width / 2, groundY });
+        auto bounceEffect = CCEaseBounceOut::create(fallAction);
+        player->runAction(CCSequence::create(CCDelayTime::create(0.2f), bounceEffect, nullptr));
+ 
+        auto nameContainer = CCNode::create();
+        nameContainer->setPosition({ winSize.width / 2, groundY + 40.f });
+        m_mainLayer->addChild(nameContainer, 10);
+
+        auto nameLabel = CCLabelBMFont::create(gm->m_playerName.c_str(), "bigFont.fnt");
+        nameLabel->setScale(0.6f);
+
+        
+        nameLabel->runAction(createRainbowAction(0.5f));
+
+       
+        auto waveSequence = CCSequence::create(
+            CCCallFuncN::create(this, callfuncN_selector(DonationPopup::runWaveAnimation)),
+            CCDelayTime::create(3.0f),
+            nullptr
+        );
+        nameLabel->runAction(CCRepeatForever::create(waveSequence));
+
+        nameContainer->addChild(nameLabel);
+
+        
+        float row1_Y = floor->getPositionY() - 35.f;
+        float row2_Y = floor->getPositionY() - 85.f;
+
+       
+        auto bannerSprite = loadSpriteSafe("banner19.png"_spr, "GJ_button_02.png");
+        float bannerScale = 0.1f;
+        if (bannerSprite->getContentSize().width > 200.f) bannerScale = 200.f / bannerSprite->getContentSize().width;
+        bannerSprite->setScale(bannerScale);
+        bannerSprite->setPosition({ winSize.width / 2, row1_Y });
+        m_mainLayer->addChild(bannerSprite);
+
+        
+        auto badgeLeft = loadSpriteSafe("magic_flower_badge.png"_spr, "starSmall_001.png");
+        badgeLeft->setScale(0.23f);
+        badgeLeft->setPosition({ winSize.width / 2 - 90.f, row1_Y });
+        m_mainLayer->addChild(badgeLeft);
+
+        
+        auto badgeRight = loadSpriteSafe("moderator_badge.png"_spr, "starSmall_001.png");
+        badgeRight->setScale(0.2f);
+        badgeRight->setPosition({ winSize.width / 2 + 90.f, row1_Y });
+        m_mainLayer->addChild(badgeRight);
+
+        
+        float textY = row1_Y - 22.f;
+
+        
+        auto mythicLabel = CCLabelBMFont::create("Mythic Badge & Mythic Banner", "goldFont.fnt");
+        mythicLabel->setPosition({ winSize.width / 2 - 45.f, textY });
+        mythicLabel->setScale(0.35f);
+        mythicLabel->runAction(createRainbowAction(0.5f));
+        mythicLabel->runAction(createPulseAction(0.8f, 0.35f));
+        m_mainLayer->addChild(mythicLabel);
+
+       
+        auto moderatorLabel = CCLabelBMFont::create("Moderator", "goldFont.fnt");
+        moderatorLabel->setPosition({ winSize.width / 2 + 90.f, textY });
+        moderatorLabel->setScale(0.4f);
+        moderatorLabel->runAction(createRainbowAction(0.5f));
+        moderatorLabel->runAction(createPulseAction(0.8f, 0.4f));
+        m_mainLayer->addChild(moderatorLabel);
+
+       
+
+        auto starIcon = loadSpriteSafe("super_star.png"_spr, "GJ_starsIcon_001.png");
+        starIcon->setPosition({ winSize.width / 2 - 60.f, row2_Y });
+        starIcon->setScale(0.2f);
+        m_mainLayer->addChild(starIcon);
+
+        auto starText = CCLabelBMFont::create("+150", "goldFont.fnt");
+        starText->setColor({ 0, 255, 0 });
+        starText->setScale(0.5f);
+        starText->setAnchorPoint({ 0.f, 0.5f });
+        starText->setPosition({ starIcon->getPositionX() + 15.f, row2_Y });
+        m_mainLayer->addChild(starText);
+
+        auto ticketIcon = loadSpriteSafe("star_tiket.png"_spr, "currencyOrbIcon_001.png");
+        ticketIcon->setPosition({ winSize.width / 2 + 20.f, row2_Y });
+        ticketIcon->setScale(0.2f);
+        m_mainLayer->addChild(ticketIcon);
+
+        auto ticketText = CCLabelBMFont::create("+20.000", "goldFont.fnt");
+        ticketText->setColor({ 0, 255, 0 });
+        ticketText->setScale(0.5f);
+        ticketText->setAnchorPoint({ 0.f, 0.5f });
+        ticketText->setPosition({ ticketIcon->getPositionX() + 15.f, row2_Y });
+        m_mainLayer->addChild(ticketText);
+
+        
+        auto menu = CCMenu::create();
+        menu->setPosition(0, 0);
 
         auto kofiBtn = CCMenuItemSpriteExtra::create(
-            ButtonSprite::create(
-                "Go to Ko-fi",
-                0,
-                0,
-                "goldFont.fnt", 
-                "GJ_button_01.png",
-                0,
-                0.8f
-                ),
-            this, 
-            menu_selector(DonationPopup::onGoToKofi)
-        );
-        auto menu = CCMenu::create(); 
-        menu->setPosition(0, 0);
-        kofiBtn->setPosition({
-            winSize.width / 2, 40.f 
-            }
-        );
+            ButtonSprite::create("Go to Ko-fi", 0, 0, "goldFont.fnt", "GJ_button_01.png", 0, 0.8f),
+            this, menu_selector(DonationPopup::onGoToKofi));
+        kofiBtn->setPosition({ winSize.width / 2, 30.f });
         menu->addChild(kofiBtn);
-        auto infoBtn = CCMenuItemSpriteExtra::create(
-            CCSprite::createWithSpriteFrameName(
-                "GJ_infoIcon_001.png"
-            ),
-            this,
-            menu_selector(
-                DonationPopup::onOpenDiscordInfo
-            )
-        );
 
-        infoBtn->setPosition({ 35.f, 35.f });
+        auto infoBtn = CCMenuItemSpriteExtra::create(
+            CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png"),
+            this, menu_selector(DonationPopup::onOpenDiscordInfo));
+        infoBtn->setPosition({ winSize.width - 25.f, winSize.height - 25.f });
         menu->addChild(infoBtn);
+
         m_mainLayer->addChild(menu);
         return true;
     }
+
 public:
     static DonationPopup* create() {
         auto ret = new DonationPopup();
-        if (ret && ret->initAnchored(280.f, 200.f)) {
+        if (ret && ret->initAnchored(360.f, 290.f, "geode.loader/GE_square03.png")) {
             ret->autorelease();
             return ret;
         }
-        CC_SAFE_DELETE(ret); 
+        CC_SAFE_DELETE(ret);
         return nullptr;
     }
 };
+
+
+
+
 
 
 class AllRachasPopup : public Popup<> {
@@ -99,251 +260,356 @@ protected:
     bool setup() override {
         this->setTitle("All Streaks");
         auto winSize = m_mainLayer->getContentSize();
-        float startX = 50.f;
-        float y = winSize.height / 2 + 20.f;
-        float spacing = 50.f;
-        std::vector<std::tuple<std::string, int, int>> rachas = {
 
-            { "racha1.png"_spr, 1, 2 },  { "racha2.png"_spr, 10, 3 }, { "racha3.png"_spr, 20, 4  },
-            { "racha4.png"_spr, 30, 5 }, { "racha5.png"_spr, 40, 6 }, { "racha6.png"_spr, 50, 7  },
-            { "racha7.png"_spr, 60, 8 }, { "racha8.png"_spr, 70, 9 }, { "racha9.png"_spr, 80, 10 }
-
+        
+        std::vector<std::tuple<std::string, int, int, int>> rachas = {
+            { "racha1.png"_spr, 1, 2, 25 },
+            { "racha2.png"_spr, 10, 3, 40 }, 
+            { "racha3.png"_spr, 20, 4, 55 },
+            { "racha4.png"_spr, 30, 5, 70 }, 
+            { "racha5.png"_spr, 40, 6, 85}, 
+            { "racha6.png"_spr, 50, 7, 100 },
+            { "racha7.png"_spr, 60, 8, 115 },
+            { "racha8.png"_spr, 70, 9, 130 }, 
+            { "racha9.png"_spr, 80, 10, 145 },
+            { "racha10.png"_spr, 90, 11, 160 },
+            { "racha11.png"_spr, 100, 12, 175 }
         };
-        int i = 0;
-        for (auto& [sprite, day, requiredPoints] : rachas) {
-            auto spr = CCSprite::create(sprite.c_str());
-            spr->setScale(0.22f);
-            spr->setPosition({ startX + i * spacing, y });
-            m_mainLayer->addChild(spr);
+
+        
+        auto limitNodeSize = [](CCNode* node, float maxSize) {
+            if (!node) return;
+            CCSize size = node->getContentSize();
+           
+            if (size.width <= 0 || size.height <= 0) return;
+
+           
+            float maxSide = std::max(size.width, size.height);
+
+          
+            if (maxSide > maxSize) {
+                float scale = maxSize / maxSide;
+                node->setScale(scale);
+            }
+            else {
+               
+                node->setScale(1.0f);
+            }
+            };
+
+        CCSize scrollSize = { winSize.width - 40.f, 150.f };
+
+        auto scrollLayer = ScrollLayer::create(scrollSize);
+        scrollLayer->setPosition((winSize.width - scrollSize.width) / 2, 35.f);
+
+        auto bg = CCScale9Sprite::create("square02_001.png");
+        bg->setContentSize(scrollSize);
+        bg->setOpacity(50);
+        bg->setPosition(winSize.width / 2, scrollLayer->getPositionY() + scrollSize.height / 2);
+        m_mainLayer->addChild(bg);
+
+        auto content = scrollLayer->m_contentLayer;
+        content->setLayout(
+            ColumnLayout::create()
+            ->setAxisReverse(true)
+            ->setGap(5.f)
+            ->setAxisAlignment(AxisAlignment::End)
+            ->setAutoGrowAxis(scrollSize.height)
+        );
+
+        for (const auto& [spriteName, day, firePoints, xpAmount] : rachas) {
+
+            auto cell = CCNode::create();
+            cell->setContentSize({ scrollSize.width, 40.f });
+
+            auto cellBg = CCScale9Sprite::create("geode.loader/GE_square03.png");
+            cellBg->setContentSize({ scrollSize.width, 40.f });
+            cellBg->setOpacity(75);
+            cellBg->setPosition(cell->getContentSize() / 2);
+            cell->addChild(cellBg);
+
+            
+            auto spr = CCSprite::create(spriteName.c_str());
+            if (spr) {
+                spr->setScale(0.25f);
+                spr->setPosition({ 30.f, 20.f });
+                cell->addChild(spr);
+            }
+
+         
             auto label = CCLabelBMFont::create(
-                CCString::createWithFormat(
-                    "Day %d",
-                     day
-                     )->getCString(),
-                    "goldFont.fnt");
-            label->setScale(0.35f);
-            label->setPosition({
-                startX + i * spacing, y - 40
-                }
+                CCString::createWithFormat("Day %d", day)->getCString(),
+                "goldFont.fnt"
             );
+            label->setScale(0.5f);
+            label->setAnchorPoint({ 0.f, 0.5f });
+            label->setPosition({ 60.f, 20.f });
+            cell->addChild(label);
 
-            m_mainLayer->addChild(label);
+         
+            auto pointsNode = CCNode::create();
+            pointsNode->setContentSize({ 130.f, 40.f });
+            pointsNode->setAnchorPoint({ 1.f, 0.5f });
+            pointsNode->setPosition({ scrollSize.width - 10.f, 20.f });
+
+            auto layout = RowLayout::create();
+            layout->setGap(10.f);
+            layout->setAxisAlignment(AxisAlignment::End);
+         
+            layout->setAutoScale(false);
+            pointsNode->setLayout(layout);
+
+          
+            auto xpIcon = CCSprite::create("xp.png"_spr);
+            if (xpIcon) {
+               
+                limitNodeSize(xpIcon, 18.0f);
+                pointsNode->addChild(xpIcon);
+            }
+
+            auto xpLabel = CCLabelBMFont::create(std::to_string(xpAmount).c_str(), "bigFont.fnt");
+            xpLabel->setScale(0.35f);
+            pointsNode->addChild(xpLabel);
+
+           
             auto pointIcon = CCSprite::create("streak_point.png"_spr);
-            pointIcon->setScale(0.12f);
-            pointIcon->setPosition({ 
-                startX + i * spacing - 4, y - 60
-                }
-            );
+            if (pointIcon) {
+              
+                limitNodeSize(pointIcon, 18.0f);
+                pointsNode->addChild(pointIcon);
+            }
 
-            m_mainLayer->addChild(pointIcon);
-            auto pointsLabel = CCLabelBMFont::create(std::to_string(requiredPoints).c_str(), "bigFont.fnt");
-            pointsLabel->setScale(0.3f);
-            pointsLabel->setPosition({
-                startX + i * spacing + 6, y - 60 
-                }
-            );
+            auto pointsLabel = CCLabelBMFont::create(std::to_string(firePoints).c_str(), "bigFont.fnt");
+            pointsLabel->setScale(0.35f);
+            pointsNode->addChild(pointsLabel);
 
-            m_mainLayer->addChild(pointsLabel);
-            i++;
+            pointsNode->updateLayout();
+            cell->addChild(pointsNode);
+
+            content->addChild(cell);
         }
+
+        content->updateLayout();
+        m_mainLayer->addChild(scrollLayer);
+
         return true;
     }
+
 public:
     static AllRachasPopup* create() {
         auto ret = new AllRachasPopup();
-        if (ret && ret->initAnchored(500.f, 155.f)) {
+        if (ret && ret->initAnchored(270.f, 230.f, "geode.loader/GE_square03.png")) {
             ret->autorelease();
             return ret;
         }
-        CC_SAFE_DELETE(ret); 
+        CC_SAFE_DELETE(ret);
         return nullptr;
     }
 };
 
 
-class DayProgressPopup : public Popup<> {
-protected:
-    std::vector<StreakData::BadgeInfo> m_streakBadges;
-    int m_currentGoalIndex = 0;
-    CCLabelBMFont* m_titleLabel = nullptr;
-    CCLabelBMFont* m_dayText = nullptr;
-    CCLayerColor* m_barBg = nullptr; 
-    CCLayerGradient* m_barFg = nullptr;
-    CCLayerColor* m_border = nullptr;
-    CCLayerColor* m_outer = nullptr;
-    CCSprite* m_rewardSprite = nullptr;
 
-    bool setup() override {
-        auto winSize = m_mainLayer->getContentSize();
-        g_streakData.load();
-        for (const auto& badge : g_streakData.badges) { 
-            if (!badge.isFromRoulette) m_streakBadges.push_back(badge);
+#ifndef GOAL_ITEM_DEFINED
+#define GOAL_ITEM_DEFINED
+struct GoalItem {
+    std::string id;
+    std::string type; 
+    int daysRequired;
+    std::string spriteName;
+    bool isUnlocked;
+};
+#endif
+
+
+class GoalCell : public CCNode {
+public:
+    static GoalCell* create(const GoalItem& item, float width) {
+        auto ret = new GoalCell();
+        if (ret && ret->init(item, width)) {
+            ret->autorelease();
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
+    }
+
+    bool init(const GoalItem& item, float width) {
+        if (!CCNode::init()) return false;
+
+        float height = 50.0f;
+        this->setContentSize(CCSize{ width, height });
+
+      
+        auto bg = CCLayerColor::create({ 0, 0, 0, 80 });
+        bg->setContentSize(CCSize{ width, height - 4 });
+        bg->setPosition(CCPoint{ 0, 2 });
+        this->addChild(bg);
+
+       
+        float iconCenterX = width - 35.0f;
+
+      
+        CCSprite* icon = CCSprite::create(item.spriteName.c_str());
+        if (!icon) icon = CCSprite::createWithSpriteFrameName("GJ_questionMark_001.png");
+
+        float maxIconSize = 40.0f;
+        float scale = 1.0f;
+ 
+        if (icon->getContentSize().width > icon->getContentSize().height) {
+            scale = 55.0f / icon->getContentSize().width;
+        }
+        else {
+            scale = maxIconSize / icon->getContentSize().height;
+        }
+        icon->setScale(scale);
+        icon->setPosition(CCPoint{ iconCenterX, height / 2 + 4.0f });
+        this->addChild(icon);
+
+      
+        int currentStreak = g_streakData.currentStreak;
+        int target = item.daysRequired;
+        if (item.isUnlocked) currentStreak = target;
+
+        float percentage = 0.0f;
+        if (target > 0) percentage = static_cast<float>(currentStreak) / static_cast<float>(target);
+        if (percentage > 1.0f) percentage = 1.0f;
+
+        float barWidth = width - 90.0f;
+        float barHeight = 16.0f;
+        float barX = 10.0f;
+        float barY = 12.0f;
+        float borderSize = 2.0f;
+
+     
+        auto border = CCLayerColor::create({ 0, 0, 0, 255 }, barWidth + (borderSize * 2), barHeight + (borderSize * 2));
+        border->setPosition(CCPoint{ barX - borderSize, barY - borderSize });
+        this->addChild(border);
+
+       
+        auto barTrack = CCLayerColor::create({ 40, 40, 40, 255 }, barWidth, barHeight);
+        barTrack->setPosition(CCPoint{ barX, barY });
+        this->addChild(barTrack);
+
+      
+        if (percentage > 0) {
+            auto barFg = CCLayerGradient::create(
+                { 0, 255, 255, 255 },   
+                { 0, 100, 200, 255 }  
+            );
+            barFg->setContentSize(CCSize{ barWidth * percentage, barHeight });
+            barFg->setPosition(CCPoint{ barX, barY });
+            this->addChild(barFg);
         }
 
-        auto leftArrow = CCSprite::createWithSpriteFrameName("GJ_arrow_01_001.png"); 
-        leftArrow->setScale(0.8f);
-        auto leftBtn = CCMenuItemSpriteExtra::create(
-            leftArrow,
-            this,
-            menu_selector(DayProgressPopup::onPreviousGoal)
-        ); 
+       
+        auto title = CCLabelBMFont::create(fmt::format("{} Days", target).c_str(), "goldFont.fnt");
+        title->setScale(0.45f);
+        title->setAnchorPoint(CCPoint{ 0.0f, 0.5f });
+        title->setPosition(CCPoint{ barX, height - 12.0f });
+        this->addChild(title);
 
-        leftBtn->setPosition({ -winSize.width / 2 + 30, 0 });
+        auto progressTxt = CCLabelBMFont::create(fmt::format("{}/{}", std::min(currentStreak, target), target).c_str(), "bigFont.fnt");
+        progressTxt->setScale(0.5f);
+        progressTxt->setPosition(CCPoint{ barX + barWidth / 2, barY + barHeight / 2 + 1 });
+        progressTxt->setColor({ 255, 255, 255 });
 
-        auto rightArrow = CCSprite::createWithSpriteFrameName("GJ_arrow_01_001.png"); 
-        rightArrow->setScale(0.8f);
-        rightArrow->setFlipX(true);
-        auto rightBtn = CCMenuItemSpriteExtra::create(
-            rightArrow,
-            this,
-            menu_selector(DayProgressPopup::onNextGoal)
-        );
-        rightBtn->setPosition({
-            winSize.width / 2 - 30, 0 
-            }
-        );
-        auto arrowMenu = CCMenu::create(); 
-        arrowMenu->addChild(leftBtn); 
-        arrowMenu->addChild(rightBtn);
-        arrowMenu->setPosition({
-            winSize.width / 2, winSize.height / 2 
-            });
-        m_mainLayer->addChild(arrowMenu);
+        auto shadow = CCLabelBMFont::create(progressTxt->getString(), "bigFont.fnt");
+        shadow->setScale(0.5f);
+        shadow->setColor({ 0,0,0 });
+        shadow->setPosition(progressTxt->getPosition() + CCPoint{ -1, -1 });
+        shadow->setZOrder(-1);
+        this->addChild(shadow);
+        this->addChild(progressTxt);
 
-        m_barBg = CCLayerColor::create(
-            ccc4(45, 45, 45, 255), 180.0f, 16.0f);
-        m_barFg = CCLayerGradient::create(
-            ccc4(250, 225, 60, 255), ccc4(255, 165, 0, 255)
-        );
+        
+        auto typeLbl = CCLabelBMFont::create(item.type.c_str(), "bigFont.fnt");
+        typeLbl->setScale(0.25f);
+        typeLbl->setAnchorPoint(CCPoint{ 0.5f, 0.5f });
+        typeLbl->setPosition(CCPoint{ iconCenterX, 8.0f });
+        typeLbl->setOpacity(150);
+        this->addChild(typeLbl);
 
-        m_border = CCLayerColor::create(
-            ccc4(255, 255, 255, 255), 182.0f, 18.0f
-        );
-        m_outer = CCLayerColor::create(
-            ccc4(0, 0, 0, 255), 186.0f, 22.0f
-        );
-
-        m_barBg->setVisible(false); 
-        m_barFg->setVisible(false);
-        m_border->setVisible(false); 
-        m_outer->setVisible(false);
-        m_mainLayer->addChild(m_barBg, 1);
-        m_mainLayer->addChild(m_barFg, 2);
-        m_mainLayer->addChild(m_border, 4);
-        m_mainLayer->addChild(m_outer, 0);
-
-        m_titleLabel = CCLabelBMFont::create(
-            "", "goldFont.fnt"
-        );
-        m_titleLabel->setScale(0.6f);
-        m_titleLabel->setPosition({
-            winSize.width / 2, winSize.height / 2 + 60
-            });
-        m_mainLayer->addChild(m_titleLabel, 5);
-        m_dayText = CCLabelBMFont::create("", "goldFont.fnt");
-        m_dayText->setScale(0.5f); 
-        m_dayText->setPosition({
-            winSize.width / 2, winSize.height / 2 - 35
-            });
-        m_mainLayer->addChild(m_dayText, 5);
-
-        updateDisplay();
         return true;
     }
+};
 
-    void updateDisplay() {
-        if (m_streakBadges.empty()) return;
+ 
+class DayProgressPopup : public Popup<> {
+protected:
+    bool setup() override {
+        this->setTitle("Streak Milestones");
         auto winSize = m_mainLayer->getContentSize();
         g_streakData.load();
-        if (m_currentGoalIndex >= m_streakBadges.size()) m_currentGoalIndex = 0;
-        auto& badge = m_streakBadges[m_currentGoalIndex];
+ 
+        std::vector<GoalItem> allGoals;
 
-        int currentDays = g_streakData.isBadgeUnlocked(badge.badgeID) ? badge.daysRequired : std::min(
-            g_streakData.currentStreak,
-            badge.daysRequired
-        );
-        float percent = badge.daysRequired > 0 ? currentDays / static_cast<float>(badge.daysRequired) : 0.f;
-
-        m_titleLabel->setString(CCString::createWithFormat("Progress to %d Days", badge.daysRequired)->getCString());
-        float barWidth = 180.0f; 
-        float barHeight = 16.0f;
-        m_barBg->setContentSize({ barWidth, barHeight });
-        m_barBg->setPosition({
-            winSize.width / 2 - barWidth / 2, winSize.height / 2 - 10 
+        for (const auto& badge : g_streakData.badges) {
+       
+            if (!badge.isFromRoulette) {
+                GoalItem item;
+                item.id = badge.badgeID;
+                item.type = "Badge";
+                item.daysRequired = badge.daysRequired;
+                item.spriteName = badge.spriteName;
+                item.isUnlocked = g_streakData.isBadgeUnlocked(badge.badgeID);
+                allGoals.push_back(item);
             }
-        );
-
-        m_barBg->setVisible(true);
-        m_barFg->setContentSize({ barWidth * percent, barHeight }); 
-        m_barFg->setPosition({
-            winSize.width / 2 - barWidth / 2, winSize.height / 2 - 10
-            }
-        );
-
-        m_barFg->setVisible(true);
-        m_border->setContentSize({ barWidth + 2, barHeight + 2 }); 
-        m_border->setPosition({
-            winSize.width / 2 - barWidth / 2 - 1, winSize.height / 2 - 11
-            }
-        ); 
-
-        m_border->setVisible(true);
-        m_border->setOpacity(120);
-        m_outer->setContentSize({
-            barWidth + 6, barHeight + 6
-            }
-        );
-
-        m_outer->setPosition({ 
-            winSize.width / 2 - barWidth / 2 - 3, winSize.height / 2 - 13
-            }
-        ); 
-
-        m_outer->setVisible(true);
-        m_outer->setOpacity(70);
-
-        if (m_rewardSprite) {
-            m_rewardSprite->removeFromParent(); 
-            m_rewardSprite = nullptr; 
         }
-        m_rewardSprite = CCSprite::create(badge.spriteName.c_str());
-        if (m_rewardSprite) {
-            m_rewardSprite->setScale(0.25f);
-        m_rewardSprite->setPosition({ 
-            winSize.width / 2, winSize.height / 2 + 30
-            }
-        ); 
-        m_mainLayer->addChild(m_rewardSprite, 5);
+
+        
+        std::sort(allGoals.begin(), allGoals.end(), [](const GoalItem& a, const GoalItem& b) {
+            return a.daysRequired < b.daysRequired;
+            });
+
+       
+        auto listSize = CCSize{ 340.f, 190.f };
+        auto scroll = ScrollLayer::create(listSize);
+
+        float cellHeight = 55.0f;
+        float totalHeight = std::max(listSize.height, (float)allGoals.size() * cellHeight);
+
+        scroll->m_contentLayer->setContentSize(CCSize{ listSize.width, totalHeight });
+
+        int i = 0;
+        for (const auto& item : allGoals) {
+            auto cell = GoalCell::create(item, listSize.width);
+            float yPos = totalHeight - (i * cellHeight) - cellHeight;
+            cell->setPosition(CCPoint{ 0, yPos });
+            scroll->m_contentLayer->addChild(cell);
+            i++;
         }
-        m_dayText->setString(
-            CCString::createWithFormat(
-               "Day %d / %d", 
-                currentDays, 
-                badge.daysRequired)->getCString()
-        );
+
+        scroll->m_contentLayer->setPositionY(listSize.height - totalHeight);
+        scroll->setPosition(CCPoint{
+            (winSize.width - listSize.width) / 2,
+            (winSize.height - listSize.height) / 2 - 10.f
+            });
+
+        auto listBg = cocos2d::extension::CCScale9Sprite::create("geode.loader/GE_square03.png");
+        listBg->setContentSize(listSize + CCSize{ 4.f, 4.f });
+        listBg->setColor({ 0,0,0 });
+        listBg->setOpacity(100);
+        listBg->setPosition(winSize / 2 - CCPoint{ 0.f, 10.f });
+        m_mainLayer->addChild(listBg);
+
+        m_mainLayer->addChild(scroll);
+
+        return true;
     }
-
-    void onNextGoal(CCObject*) {
-        if (m_streakBadges.empty()) return;
-        m_currentGoalIndex = (m_currentGoalIndex + 1) % m_streakBadges.size();
-        updateDisplay();
-    }
-
-
-    void onPreviousGoal(CCObject*) {
-        if (m_streakBadges.empty()) return;
-        m_currentGoalIndex = (m_currentGoalIndex - 1 + m_streakBadges.size()) % m_streakBadges.size();
-        updateDisplay(); 
-    }
-
 
 public:
     static DayProgressPopup* create() {
         auto ret = new DayProgressPopup();
-        if (ret && ret->initAnchored(300.f, 180.f)) { ret->autorelease(); return ret; }
-        CC_SAFE_DELETE(ret); return nullptr;
+        if (ret && ret->initAnchored(380.f, 260.f, "geode.loader/GE_square03.png")) {
+            ret->autorelease();
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
     }
 };
+
+
 
 class StreakProgressBar : public cocos2d::CCLayerColor {
 protected:
