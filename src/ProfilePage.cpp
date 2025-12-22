@@ -35,16 +35,19 @@ class $modify(MyProfilePage, ProfilePage) {
         spinner->setLoading("");
         spinner->setScale(scale);
 
-        auto container = CCMenuItem::create();
-        container->setContentSize({
-            30.f,
-            30.f
-            });
+       
+        auto dummyNode = CCNode::create();
+        dummyNode->setContentSize({ 30.f, 30.f });
+
+        auto container = CCMenuItemSprite::create(
+            dummyNode,
+            nullptr,
+            nullptr
+        );
+        container->setContentSize({ 30.f, 30.f });
         container->setID(id);
 
-        spinner->setPosition(
-            container->getContentSize() / 2
-        );
+        spinner->setPosition(container->getContentSize() / 2);
         container->addChild(spinner);
 
         return container;
