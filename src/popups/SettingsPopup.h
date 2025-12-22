@@ -3,7 +3,7 @@
 #include <Geode/ui/ScrollLayer.hpp>
 #include <Geode/utils/cocos.hpp>
 #include <Geode/utils/web.hpp> 
-#include "StreakData.h"
+#include "../StreakData.h"
 #include "HistoryPopup.h" 
 
 using namespace geode::prelude;
