@@ -17,7 +17,7 @@ struct NotificationData {
     float iconScale;
 };
 
-class SystemNotification : public CCNode {
+class SystemNotification : public cocos2d::CCLayer {
     static std::queue<NotificationData> s_queue;
     static SystemNotification* s_activeNotification;
 
@@ -51,7 +51,7 @@ private:
 
         auto node = SystemNotification::create(title, message, iconName, iconScale);
         s_activeNotification = node;
-        scene->addChild(node, std::numeric_limits<int>::max());
+        scene->addChild(node, 1000);
     }
 
     static void processQueue() {
@@ -83,10 +83,7 @@ protected:
         return nullptr;
     }
 
-   
-
     void animateChildrenEntry() {
-       
         CCSize fullSize = this->getContentSize();
 
         auto stretchBg = CCEaseBackOut::create(CCScaleTo::create(0.4f, 1.0f, 1.0f));
@@ -97,7 +94,6 @@ protected:
     }
 
     void animateTextEntry() {
-     
         if (m_textContainer) {
             m_textContainer->setVisible(true);
             m_textContainer->runAction(CCFadeIn::create(0.2f));
@@ -105,16 +101,14 @@ protected:
     }
 
     void animateTextExit() {
-     
         if (m_textContainer) {
             m_textContainer->runAction(CCFadeOut::create(0.15f));
         }
     }
 
     void animateChildrenExit() {
-       
         CCSize size = this->getContentSize();
-        float squareSize = 34.f / 230.f; 
+        float squareSize = 34.f / 230.f;
 
         auto shrinkBg = CCEaseBackIn::create(CCScaleTo::create(0.3f, squareSize, 1.0f));
         if (m_bg) m_bg->runAction(shrinkBg);
@@ -123,12 +117,14 @@ protected:
         if (m_icon) m_icon->runAction(centerIcon);
     }
 
-   
-
     bool init(const std::string& title, const std::string& message,
         const std::string& iconName,
         float iconScale) {
-        if (!CCNode::init()) return false;
+        if (!CCLayer::init()) return false;
+
+        this->setTouchEnabled(false);
+        this->setKeypadEnabled(false);
+        this->ignoreAnchorPointForPosition(false);
 
         auto winSize = CCDirector::sharedDirector()->getWinSize();
         m_isEntering = true;
@@ -187,13 +183,9 @@ protected:
         m_bg->setScaleX(squareSize);
         if (m_icon) m_icon->setPosition(fullSize / 2);
 
-      
         auto moveDown = CCEaseOut::create(CCMoveTo::create(0.4f, ccp(winSize.width / 2, finalY)), 2.0f);
         auto playSound = CCCallFunc::create(this, callfunc_selector(SystemNotification::playNotificationSound));
- 
         auto animateChildren = CCCallFunc::create(this, callfunc_selector(SystemNotification::animateChildrenEntry));
-
-       
         auto animateText = CCCallFunc::create(this, callfunc_selector(SystemNotification::animateTextEntry));
 
         auto sequence = CCSequence::create(
@@ -225,10 +217,8 @@ protected:
     void triggerExit(float dt) {
         if (m_isExiting) return;
         m_isExiting = true;
- 
-        auto hideTextFn = CCCallFunc::create(this, callfunc_selector(SystemNotification::animateTextExit));
 
-       
+        auto hideTextFn = CCCallFunc::create(this, callfunc_selector(SystemNotification::animateTextExit));
         auto shrinkFn = CCCallFunc::create(this, callfunc_selector(SystemNotification::animateChildrenExit));
 
         auto moveUp = CCEaseIn::create(CCMoveBy::create(0.3f, ccp(0, 50.f)), 2.0f);
@@ -237,10 +227,8 @@ protected:
         auto exitSeq = CCSequence::create(
             hideTextFn,
             CCDelayTime::create(0.15f),
-
             shrinkFn,
             CCDelayTime::create(0.3f),
-
             CCSpawn::create(moveUp, fadeAll, nullptr),
             CCCallFunc::create(this, callfunc_selector(SystemNotification::removeAndCheckQueue)),
             nullptr
