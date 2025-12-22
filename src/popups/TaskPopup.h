@@ -3,7 +3,7 @@
 #include <Geode/ui/ScrollLayer.hpp>
 #include <Geode/ui/TextInput.hpp>
 #include <Geode/utils/web.hpp>
-#include "StreakData.h"
+#include "../StreakData.h"
 #include <Geode/binding/CCTextInputNode.hpp>
 
 using namespace geode::prelude;

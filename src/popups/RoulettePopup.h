@@ -4,7 +4,6 @@
 #include "ShopPopup.h"
 #include "../FirebaseManager.h"
 #include <Geode/utils/cocos.hpp>
-
 #include "../BadgeNotification.h"
 #include "../RewardNotification.h"
 

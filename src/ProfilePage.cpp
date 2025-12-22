@@ -1,6 +1,6 @@
-﻿#include "StreakData.h" 
+﻿#include "../StreakData.h" 
 #include "popups/ProfileCardPopup.h" 
-#include "StatusSpinner.h"
+#include "../StatusSpinner.h"
 #include <Geode/modify/ProfilePage.hpp>
 #include <Geode/binding/CCMenuItemSpriteExtra.hpp>
 #include <Geode/binding/GJAccountManager.hpp>
