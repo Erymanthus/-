@@ -1,3 +1,13 @@
+# Streak!
+
+# 1.10.2 Banners & Custom Profiles
+- New events
+- Texture update
+- Banners implementation
+- Custom profiles
+- Experience levels
+- New streak design
+
 # 1.10.1 
 - New style for roulette
 - New badges

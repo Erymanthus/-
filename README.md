@@ -1,4 +1,4 @@
-# Streak! (beta)
+# Streak!
 
 A simple and fun mod that tracks your daily activity streak and rewards your consistency with unlockable badges and animations.
 
