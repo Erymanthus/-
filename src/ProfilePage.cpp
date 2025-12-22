@@ -1,4 +1,4 @@
-﻿#include "../StreakData.h" 
+﻿#include "StreakData.h" 
 #include "popups/ProfileCardPopup.h" 
 #include "../StatusSpinner.h"
 #include <Geode/modify/ProfilePage.hpp>

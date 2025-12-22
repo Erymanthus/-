@@ -1,5 +1,5 @@
 #pragma once
-#include "StreakCommon.h"
+#include "../StreakCommon.h"
 #include <Geode/utils/cocos.hpp>
 
 class TicketAnimationLayer : public CCLayer {
