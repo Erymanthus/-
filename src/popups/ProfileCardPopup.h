@@ -3,7 +3,7 @@
 #include <Geode/utils/cocos.hpp>
 #include <Geode/utils/web.hpp>
 #include "../StreakData.h"
-#include "StatusSpinner.h"  
+#include "../StatusSpinner.h"  
 
 using namespace geode::prelude;
 
