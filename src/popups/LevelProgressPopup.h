@@ -1,6 +1,6 @@
 #pragma once
 #include "StreakCommon.h"
-#include "../SharedVisuals.h"
+#include "SharedVisuals.h"
 #include <Geode/ui/Popup.hpp>
 #include <Geode/ui/ScrollLayer.hpp>
 #include <Geode/binding/GameLevelManager.hpp>
