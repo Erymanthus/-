@@ -7,7 +7,7 @@
 #include <Geode/binding/GJAccountManager.hpp>
 #include <Geode/binding/ProfilePage.hpp>
 #include <matjson.hpp>
-#include "StatusSpinner.h"
+#include "../StatusSpinner.h"
 
 using namespace geode::prelude;
 

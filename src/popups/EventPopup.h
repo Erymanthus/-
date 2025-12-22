@@ -7,7 +7,7 @@
 #include "../BadgeNotification.h"
 #include "../RewardNotification.h"
 #include "SharedVisuals.h" 
-#include "StatusSpinner.h"
+#include "../StatusSpinner.h"
 #include <Geode/ui/Notification.hpp>
 
 using namespace geode::prelude;
