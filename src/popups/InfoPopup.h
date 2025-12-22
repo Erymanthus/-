@@ -14,7 +14,7 @@
 #include "LevelProgressPopup.h"
 #include "RoulettePopup.h"
 #include "SendMessagePopup.h"
-#include "SystemNotification.h"
+#include "../SystemNotification.h"
 #include "XPPopup.h" 
 #include "SettingsPopup.h"
 #include "ProfileCardPopup.h"
