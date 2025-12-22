@@ -25,6 +25,7 @@ public:
     }
 };
 
+
 class $modify(MyProfilePage, ProfilePage) {
     struct Fields {
         EventListener<web::WebTask> m_remoteDataListener;
