@@ -83,6 +83,48 @@ protected:
         return nullptr;
     }
 
+   
+
+    void animateChildrenEntry() {
+       
+        CCSize fullSize = this->getContentSize();
+
+        auto stretchBg = CCEaseBackOut::create(CCScaleTo::create(0.4f, 1.0f, 1.0f));
+        if (m_bg) m_bg->runAction(stretchBg);
+
+        auto slideIcon = CCEaseBackOut::create(CCMoveTo::create(0.4f, ccp(20.f, fullSize.height / 2)));
+        if (m_icon) m_icon->runAction(slideIcon);
+    }
+
+    void animateTextEntry() {
+     
+        if (m_textContainer) {
+            m_textContainer->setVisible(true);
+            m_textContainer->runAction(CCFadeIn::create(0.2f));
+        }
+    }
+
+    void animateTextExit() {
+     
+        if (m_textContainer) {
+            m_textContainer->runAction(CCFadeOut::create(0.15f));
+        }
+    }
+
+    void animateChildrenExit() {
+       
+        CCSize size = this->getContentSize();
+        float squareSize = 34.f / 230.f; 
+
+        auto shrinkBg = CCEaseBackIn::create(CCScaleTo::create(0.3f, squareSize, 1.0f));
+        if (m_bg) m_bg->runAction(shrinkBg);
+
+        auto centerIcon = CCEaseBackIn::create(CCMoveTo::create(0.3f, size / 2));
+        if (m_icon) m_icon->runAction(centerIcon);
+    }
+
+   
+
     bool init(const std::string& title, const std::string& message,
         const std::string& iconName,
         float iconScale) {
@@ -145,31 +187,21 @@ protected:
         m_bg->setScaleX(squareSize);
         if (m_icon) m_icon->setPosition(fullSize / 2);
 
-     
+      
         auto moveDown = CCEaseOut::create(CCMoveTo::create(0.4f, ccp(winSize.width / 2, finalY)), 2.0f);
         auto playSound = CCCallFunc::create(this, callfunc_selector(SystemNotification::playNotificationSound));
-
-        
-        auto animateChildren = CCCallFunc::create([this, fullSize]() {
-            auto stretchBg = CCEaseBackOut::create(CCScaleTo::create(0.4f, 1.0f, 1.0f));
-            m_bg->runAction(stretchBg);
-
-            auto slideIcon = CCEaseBackOut::create(CCMoveTo::create(0.4f, ccp(20.f, fullSize.height / 2)));
-            m_icon->runAction(slideIcon);
-            });
+ 
+        auto animateChildren = CCCallFunc::create(this, callfunc_selector(SystemNotification::animateChildrenEntry));
 
        
-        auto animateText = CCCallFunc::create([this]() {
-            m_textContainer->setVisible(true);
-            m_textContainer->runAction(CCFadeIn::create(0.2f));
-            });
+        auto animateText = CCCallFunc::create(this, callfunc_selector(SystemNotification::animateTextEntry));
 
         auto sequence = CCSequence::create(
             CCSpawn::create(moveDown, playSound, nullptr),
             animateChildren,
-            CCDelayTime::create(0.4f + 0.1f),  
+            CCDelayTime::create(0.4f + 0.1f),
             animateText,
-            CCDelayTime::create(0.2f),  
+            CCDelayTime::create(0.2f),
             CCCallFunc::create(this, callfunc_selector(SystemNotification::onEnterFinished)),
             nullptr
         );
@@ -193,33 +225,21 @@ protected:
     void triggerExit(float dt) {
         if (m_isExiting) return;
         m_isExiting = true;
-
-        CCSize size = this->getContentSize();
  
-        auto hideTextFn = CCCallFunc::create([this]() {
-            m_textContainer->runAction(CCFadeOut::create(0.15f));
-            });
+        auto hideTextFn = CCCallFunc::create(this, callfunc_selector(SystemNotification::animateTextExit));
 
-      
-        auto shrinkFn = CCCallFunc::create([this, size]() {
-            float squareSize = 34.f / 230.f;
-            auto shrinkBg = CCEaseBackIn::create(CCScaleTo::create(0.3f, squareSize, 1.0f));
-            m_bg->runAction(shrinkBg);
+       
+        auto shrinkFn = CCCallFunc::create(this, callfunc_selector(SystemNotification::animateChildrenExit));
 
-            auto centerIcon = CCEaseBackIn::create(CCMoveTo::create(0.3f, size / 2));
-            m_icon->runAction(centerIcon);
-            });
-
-      
         auto moveUp = CCEaseIn::create(CCMoveBy::create(0.3f, ccp(0, 50.f)), 2.0f);
         auto fadeAll = CCFadeOut::create(0.3f);
 
         auto exitSeq = CCSequence::create(
             hideTextFn,
-            CCDelayTime::create(0.15f), 
+            CCDelayTime::create(0.15f),
 
             shrinkFn,
-            CCDelayTime::create(0.3f),  
+            CCDelayTime::create(0.3f),
 
             CCSpawn::create(moveUp, fadeAll, nullptr),
             CCCallFunc::create(this, callfunc_selector(SystemNotification::removeAndCheckQueue)),
