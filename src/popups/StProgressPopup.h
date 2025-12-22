@@ -2,7 +2,7 @@
 #include <Geode/ui/Popup.hpp>
 #include <Geode/ui/ScrollLayer.hpp>
 #include <Geode/ui/Notification.hpp>
-#include "StreakData.h"
+#include "../StreakData.h"
 #include "../BannerNotification.h"
 #include "../BadgeNotification.h"
 #include "../RewardNotification.h"
