@@ -7,7 +7,7 @@
 #include <Geode/ui/ScrollLayer.hpp>
 #include <Geode/binding/TextArea.hpp>
 #include "../SystemNotification.h"
-#include "StatusSpinner.h"
+#include "../StatusSpinner.h"
 
 using namespace geode::prelude;
 
