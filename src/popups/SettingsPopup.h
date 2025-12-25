@@ -86,7 +86,10 @@ protected:
         m_scrollLayer->m_contentLayer->addChild(cell);
     }
 
-    void addImageButtonSetting(const std::string& name, const std::string& spriteName, SEL_MenuHandler callback, const std::string& infoText) {
+    void addImageButtonSetting(const std::string& name,
+        const std::string& spriteName,
+        SEL_MenuHandler callback,
+        const std::string& infoText) {
         auto cell = createBaseCell();
         auto menu = CCMenu::create();
         menu->setPosition(0, 0);
@@ -138,7 +141,9 @@ protected:
         m_scrollLayer->m_contentLayer->addChild(cell);
     }
 
-    void addArrowSetting(const std::string& name, const std::string& saveKey, const std::string& infoText) {
+    void addArrowSetting(const std::string& name,
+        const std::string& saveKey,
+        const std::string& infoText) {
         auto cell = createBaseCell();
         auto menu = CCMenu::create();
         menu->setPosition(0, 0);
@@ -312,7 +317,7 @@ protected:
             "Copy your unique Streak ID"
         );
 
-        addVersionSetting("Mod Version", "1.10.2");
+        addVersionSetting("Mod Version", "1.10.27");
 
         content->updateLayout();
         m_mainLayer->addChild(m_scrollLayer);

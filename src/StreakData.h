@@ -167,6 +167,8 @@ struct StreakData {
         {0, "moderator_badge.png"_spr, "Moderator", BadgeCategory::LEGENDARY, "moderator_badge",true},
         {0, "creator_badge.png"_spr, "Content creator", BadgeCategory::LEGENDARY, "creator_badge",true},
         {0, "vip_badge.png"_spr, "V.I.P Player", BadgeCategory::MYTHIC, "vip_badge",true},
+        {0, "stellar_badge.png"_spr, "Stellar Player", BadgeCategory::MYTHIC, "stellar_badge",true },
+
 
         //black hole
         {0, "bh_badge_1.png"_spr, "Black hole Red", BadgeCategory::EPIC, "bh_badge_1",true},
@@ -232,6 +234,8 @@ struct StreakData {
     {"banner_37", "banner37.png"_spr, "The Big City", BadgeCategory::SPECIAL},
     {"banner_38", "banner38.png"_spr, "Tidal Wave", BadgeCategory::EPIC},
     {"banner_39", "banner39.png"_spr, "Emerald Realm", BadgeCategory::LEGENDARY},
+    {"banner_40", "banner40.png"_spr, "Stellar", BadgeCategory::MYTHIC},
+    {"banner_41", "banner41.png"_spr, "V.I.P", BadgeCategory::MYTHIC},
 
     };
 
