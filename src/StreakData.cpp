@@ -330,6 +330,7 @@ void StreakData::dailyUpdate() {
     streakPointsToday = 0;
     dailyMsgCount = 0;
     lastDay = today;
+    hasNewStreak = false;
     pointMission1Claimed = false;
     pointMission2Claimed = false;
     pointMission3Claimed = false; 
@@ -380,14 +381,12 @@ void StreakData::addPoints(int count) {
    
     bool stuckAtZero = (currentStreak == 0 && streakPointsToday >= currentRequired);
 
-    if ((!alreadyReachedGoalToday || stuckAtZero) && streakPointsToday >= currentRequired) {
+    if ((!alreadyReachedGoalToday || stuckAtZero) && streakPointsToday >= currentRequired && !hasNewStreak) {
      
         currentStreak++;
-        hasNewStreak = true;
+        hasNewStreak = true; 
 
-    
-
-        int starsToSend = 1; 
+        int starsToSend = 1;
 
        
         if (count >= 6) starsToSend = 10;      

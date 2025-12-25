@@ -1,5 +1,8 @@
 # Streak!
 
+# 1.10.25
+- Fix Bugs
+
 # 1.10.2 Banners & Custom Profiles
 - New events
 - Texture update
