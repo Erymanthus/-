@@ -144,7 +144,15 @@ class $modify(MyProfilePage, ProfilePage) {
 
         if (!badgeId.empty() && badgeInfo) {
             if (auto username_menu = m_mainLayer->getChildByIDRecursive("username-menu")) {
-                auto badgeSprite = CCSprite::create(badgeInfo->spriteName.c_str());
+                CCSprite* badgeSprite = CCSprite::create(badgeInfo->spriteName.c_str());
+
+                if (!badgeSprite) {
+                    badgeSprite = CCSprite::createWithSpriteFrameName(badgeInfo->spriteName.c_str());
+                }
+
+                if (!badgeSprite) {
+                    badgeSprite = CCSprite::createWithSpriteFrameName("edit_delBtn_001.png");
+                }
 
                 if (badgeSprite) {
                     badgeSprite->setScale(0.2f);
@@ -266,9 +274,15 @@ class $modify(MyProfilePage, ProfilePage) {
                 auto equippedBadge = g_streakData.getEquippedBadge();
 
                 if (equippedBadge) {
-                    auto badgeSprite = CCSprite::create(
-                        equippedBadge->spriteName.c_str()
-                    );
+                    CCSprite* badgeSprite = CCSprite::create(equippedBadge->spriteName.c_str());
+
+                    if (!badgeSprite) {
+                        badgeSprite = CCSprite::createWithSpriteFrameName(equippedBadge->spriteName.c_str());
+                    }
+
+                    if (!badgeSprite) {
+                        badgeSprite = CCSprite::createWithSpriteFrameName("edit_delBtn_001.png");
+                    }
 
                     if (badgeSprite) {
                         badgeSprite->setScale(0.2f);
