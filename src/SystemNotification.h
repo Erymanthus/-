@@ -51,7 +51,9 @@ private:
 
         auto node = SystemNotification::create(title, message, iconName, iconScale);
         s_activeNotification = node;
-        scene->addChild(node, 1000);
+
+      
+        scene->addChild(node, std::numeric_limits<int>::max());
     }
 
     static void processQueue() {

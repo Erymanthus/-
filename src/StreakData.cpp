@@ -288,7 +288,7 @@ void StreakData::dailyUpdate() {
         pointMission4Claimed = false;
         pointMission5Claimed = false;
         pointMission6Claimed = false;
-        save();
+      
         return;
     }
 
@@ -305,7 +305,7 @@ void StreakData::dailyUpdate() {
     pointMission5Claimed = false;
     pointMission6Claimed = false;
 
-    updatePlayerDataInFirebase();
+  
 }
 
 void StreakData::checkRewards() {
@@ -494,12 +494,16 @@ void StreakData::addXP(int amount) {
 StreakData::LevelRewards StreakData::getRewardsForLevel(int level) {
     int r_tickets = 0;
     int r_stars = 0;
-    if (level < 10) r_tickets = 25;
-    else if (level < 20) r_tickets = 30;
+
+    
+    if (level < 10) r_tickets = 40;      
+    else if (level < 20) r_tickets = 48;    
     else {
         int tier = (level / 10) - 1;
-        r_tickets = 30 * std::pow(2, tier);
+        r_tickets = 48 * std::pow(2, tier); 
     }
+
+  
     if (level < 10) r_stars = 5;
     else if (level < 20) r_stars = 20;
     else {

@@ -25,7 +25,6 @@ public:
     }
 };
 
-
 class $modify(MyProfilePage, ProfilePage) {
     struct Fields {
         EventListener<web::WebTask> m_remoteDataListener;
@@ -36,7 +35,6 @@ class $modify(MyProfilePage, ProfilePage) {
         spinner->setLoading("");
         spinner->setScale(scale);
 
-       
         auto dummyNode = CCNode::create();
         dummyNode->setContentSize({ 30.f, 30.f });
 
@@ -210,12 +208,15 @@ class $modify(MyProfilePage, ProfilePage) {
                 statsMenu->updateLayout();
             }
 
+            int accountID = score->m_accountID;
+            std::string userName = score->m_userName;
+
             std::string url = fmt::format(
                 "https://streak-servidor.onrender.com/players/{}",
-                score->m_accountID
+                accountID
             );
 
-            m_fields->m_remoteDataListener.bind([this, score](web::WebTask::Event* e) {
+            m_fields->m_remoteDataListener.bind([this, accountID, userName](web::WebTask::Event* e) {
                 if (web::WebResponse* res = e->getValue()) {
                     if (auto username_menu = m_mainLayer->getChildByIDRecursive("username-menu")) {
                         if (auto loader = username_menu->getChildByID(LOADING_BADGE_ID)) {
@@ -234,8 +235,8 @@ class $modify(MyProfilePage, ProfilePage) {
                         auto json = res->json().unwrap();
 
                         ProfileData pData;
-                        pData.accountID = score->m_accountID;
-                        pData.username = score->m_userName;
+                        pData.accountID = accountID;
+                        pData.username = userName;
                         pData.currentStreak = json["current_streak_days"].as<int>().unwrapOr(0);
                         pData.totalSP = json["total_streak_points"].as<int>().unwrapOr(0);
 
