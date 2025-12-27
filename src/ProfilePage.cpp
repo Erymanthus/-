@@ -7,10 +7,7 @@
 #include <Geode/binding/GJUserScore.hpp>
 #include <Geode/utils/web.hpp>
 #include <Geode/loader/Event.hpp>
-#include <Geode/loader/Loader.hpp>
 #include <matjson.hpp>
-
-using namespace geode::prelude;
 
 const char* STREAK_STAT_ID = "jotabelike.gd_racha/streak-stat-item";
 const char* STREAK_BADGE_ID = "jotabelike.gd_racha/streak-badge-item";
@@ -28,6 +25,7 @@ public:
     }
 };
 
+
 class $modify(MyProfilePage, ProfilePage) {
     struct Fields {
         EventListener<web::WebTask> m_remoteDataListener;
@@ -35,16 +33,10 @@ class $modify(MyProfilePage, ProfilePage) {
 
     CCMenuItem* createSpinnerItem(const char* id, float scale = 0.5f) {
         auto spinner = StatusSpinner::create();
-        if (!spinner) {
-            auto fallback = CCSprite::create("loadingCircle.png"_spr);
-            if (!fallback) fallback = CCSprite::create();
-            spinner = static_cast<StatusSpinner*>(static_cast<CCNode*>(fallback));
-        }
-        else {
-            spinner->setLoading("");
-        }
+        spinner->setLoading("");
         spinner->setScale(scale);
 
+       
         auto dummyNode = CCNode::create();
         dummyNode->setContentSize({ 30.f, 30.f });
 
@@ -110,115 +102,10 @@ class $modify(MyProfilePage, ProfilePage) {
         )->show();
     }
 
-    void updateUIWithRemoteData(int accountID, std::string userName, matjson::Value json) {
-        if (!this->m_mainLayer) return;
-
-        if (auto username_menu = m_mainLayer->getChildByIDRecursive("username-menu")) {
-            if (auto loader = username_menu->getChildByID(LOADING_BADGE_ID)) {
-                loader->removeFromParent();
-                username_menu->updateLayout();
-            }
-        }
-        if (auto statsMenu = m_mainLayer->getChildByIDRecursive("stats-menu")) {
-            if (auto loader = statsMenu->getChildByID(LOADING_STAT_ID)) {
-                loader->removeFromParent();
-                statsMenu->updateLayout();
-            }
-        }
-
-        ProfileData pData;
-        pData.accountID = accountID;
-        pData.username = userName;
-        pData.currentStreak = json["current_streak_days"].as<int>().unwrapOr(0);
-        pData.totalSP = json["total_streak_points"].as<int>().unwrapOr(0);
-
-        std::string badgeId = json["equipped_badge_id"].as<std::string>().unwrapOr("");
-        pData.badgeID = badgeId;
-        pData.isPartialData = true;
-        pData.isMythic = false;
-
-        auto badgeInfo = g_streakData.getBadgeInfo(badgeId);
-        if (badgeInfo && badgeInfo->category == StreakData::BadgeCategory::MYTHIC) {
-            pData.isMythic = true;
-        }
-
-        if (!badgeId.empty() && badgeInfo) {
-            if (auto username_menu = m_mainLayer->getChildByIDRecursive("username-menu")) {
-                CCSprite* badgeSprite = CCSprite::create(badgeInfo->spriteName.c_str());
-
-                if (!badgeSprite) {
-                    badgeSprite = CCSprite::createWithSpriteFrameName(badgeInfo->spriteName.c_str());
-                }
-
-                if (!badgeSprite) {
-                    badgeSprite = CCSprite::createWithSpriteFrameName("edit_delBtn_001.png");
-                }
-
-                if (badgeSprite) {
-                    badgeSprite->setScale(0.2f);
-                    auto badgeButton = CCMenuItemSpriteExtra::create(
-                        badgeSprite,
-                        this,
-                        menu_selector(MyProfilePage::onBadgeInfoClick)
-                    );
-                    badgeButton->setUserObject("badge"_spr, CCString::create(badgeId));
-                    badgeButton->setID(STREAK_BADGE_ID);
-
-                    username_menu->addChild(badgeButton);
-                    username_menu->updateLayout();
-                }
-            }
-        }
-
-        if (auto statsMenu = m_mainLayer->getChildByIDRecursive("stats-menu")) {
-            auto pointsLabel = CCLabelBMFont::create(
-                std::to_string(pData.totalSP).c_str(),
-                "bigFont.fnt"
-            );
-            pointsLabel->setScale(0.6f);
-
-            auto pointIcon = CCSprite::create("streak_point.png"_spr);
-            pointIcon->setScale(0.2f);
-
-            auto canvas = CCSprite::create();
-            float totalInnerWidth = pointsLabel->getScaledContentSize().width + pointIcon->getScaledContentSize().width + 2.f;
-
-            canvas->setContentSize({ totalInnerWidth, 28.0f });
-            canvas->setOpacity(0);
-
-            pointsLabel->setPosition(ccp(
-                (canvas->getContentSize().width / 2) - (totalInnerWidth / 2) + (pointsLabel->getScaledContentSize().width / 2),
-                canvas->getContentSize().height / 2
-            ));
-
-            pointIcon->setPosition(ccp(
-                pointsLabel->getPositionX() + (pointsLabel->getScaledContentSize().width / 2) + (pointIcon->getScaledContentSize().width / 2) + 2.f,
-                canvas->getContentSize().height / 2
-            ));
-
-            canvas->addChild(pointsLabel);
-            canvas->addChild(pointIcon);
-
-            auto statItem = CCMenuItemSpriteExtra::create(
-                canvas,
-                this,
-                menu_selector(MyProfilePage::onOtherStreakStatClick)
-            );
-            statItem->setUserObject(
-                "user-profile"_spr,
-                StreakUserProfile::create(pData)
-            );
-            statItem->setID(STREAK_STAT_ID);
-
-            statsMenu->addChild(statItem);
-            statsMenu->updateLayout();
-        }
-    }
-
     void loadPageFromUserInfo(GJUserScore * score) {
         ProfilePage::loadPageFromUserInfo(score);
 
-        if (score->m_accountID == GJAccountManager::get()->m_accountID) {
+        if (score->m_accountID == GJAccountManager::get()->get()->m_accountID) {
             if (auto statsMenu = m_mainLayer->getChildByIDRecursive("stats-menu")) {
                 if (auto oldStat = statsMenu->getChildByID(STREAK_STAT_ID)) {
                     oldStat->removeFromParent();
@@ -274,15 +161,9 @@ class $modify(MyProfilePage, ProfilePage) {
                 auto equippedBadge = g_streakData.getEquippedBadge();
 
                 if (equippedBadge) {
-                    CCSprite* badgeSprite = CCSprite::create(equippedBadge->spriteName.c_str());
-
-                    if (!badgeSprite) {
-                        badgeSprite = CCSprite::createWithSpriteFrameName(equippedBadge->spriteName.c_str());
-                    }
-
-                    if (!badgeSprite) {
-                        badgeSprite = CCSprite::createWithSpriteFrameName("edit_delBtn_001.png");
-                    }
+                    auto badgeSprite = CCSprite::create(
+                        equippedBadge->spriteName.c_str()
+                    );
 
                     if (badgeSprite) {
                         badgeSprite->setScale(0.2f);
@@ -329,39 +210,119 @@ class $modify(MyProfilePage, ProfilePage) {
                 statsMenu->updateLayout();
             }
 
-            int accountID = score->m_accountID;
-            std::string userName = score->m_userName;
-
             std::string url = fmt::format(
                 "https://streak-servidor.onrender.com/players/{}",
-                accountID
+                score->m_accountID
             );
 
-            this->retain();
-
-            m_fields->m_remoteDataListener.bind([this, accountID, userName](web::WebTask::Event* e) {
+            m_fields->m_remoteDataListener.bind([this, score](web::WebTask::Event* e) {
                 if (web::WebResponse* res = e->getValue()) {
+                    if (auto username_menu = m_mainLayer->getChildByIDRecursive("username-menu")) {
+                        if (auto loader = username_menu->getChildByID(LOADING_BADGE_ID)) {
+                            loader->removeFromParent();
+                            username_menu->updateLayout();
+                        }
+                    }
+                    if (auto statsMenu = m_mainLayer->getChildByIDRecursive("stats-menu")) {
+                        if (auto loader = statsMenu->getChildByID(LOADING_STAT_ID)) {
+                            loader->removeFromParent();
+                            statsMenu->updateLayout();
+                        }
+                    }
+
                     if (res->ok() && res->json().isOk()) {
                         auto json = res->json().unwrap();
 
-                        Loader::get()->queueInMainThread([this, accountID, userName, json]() {
-                            this->updateUIWithRemoteData(accountID, userName, json);
-                            this->autorelease();
-                            });
+                        ProfileData pData;
+                        pData.accountID = score->m_accountID;
+                        pData.username = score->m_userName;
+                        pData.currentStreak = json["current_streak_days"].as<int>().unwrapOr(0);
+                        pData.totalSP = json["total_streak_points"].as<int>().unwrapOr(0);
+
+                        std::string badgeId = json["equipped_badge_id"].as<std::string>().unwrapOr("");
+                        pData.badgeID = badgeId;
+
+                        pData.isMythic = false;
+                        if (auto bInfo = g_streakData.getBadgeInfo(badgeId)) {
+                            if (bInfo->category == StreakData::BadgeCategory::MYTHIC) {
+                                pData.isMythic = true;
+                            }
+                        }
+
+                        pData.isPartialData = true;
+
+                        if (!badgeId.empty() && g_streakData.getBadgeInfo(badgeId)) {
+                            if (auto username_menu = m_mainLayer->getChildByIDRecursive("username-menu")) {
+                                auto badgeSprite = CCSprite::create(
+                                    g_streakData.getBadgeInfo(badgeId)->spriteName.c_str()
+                                );
+                                badgeSprite->setScale(0.2f);
+
+                                auto badgeButton = CCMenuItemSpriteExtra::create(
+                                    badgeSprite,
+                                    this,
+                                    menu_selector(MyProfilePage::onBadgeInfoClick)
+                                );
+                                badgeButton->setUserObject(
+                                    "badge"_spr,
+                                    CCString::create(badgeId)
+                                );
+                                badgeButton->setID(STREAK_BADGE_ID);
+
+                                username_menu->addChild(badgeButton);
+                                username_menu->updateLayout();
+                            }
+                        }
+
+                        if (auto statsMenu = m_mainLayer->getChildByIDRecursive("stats-menu")) {
+                            auto pointsLabel = CCLabelBMFont::create(
+                                std::to_string(pData.totalSP).c_str(),
+                                "bigFont.fnt"
+                            );
+                            pointsLabel->setScale(0.6f);
+
+                            auto pointIcon = CCSprite::create("streak_point.png"_spr);
+                            pointIcon->setScale(0.2f);
+
+                            auto canvas = CCSprite::create();
+                            float totalInnerWidth = pointsLabel->getScaledContentSize().width + pointIcon->getScaledContentSize().width + 2.f;
+
+                            canvas->setContentSize({
+                                totalInnerWidth,
+                                28.0f
+                                });
+                            canvas->setOpacity(0);
+
+                            pointsLabel->setPosition(ccp(
+                                (canvas->getContentSize().width / 2) - (totalInnerWidth / 2) + (pointsLabel->getScaledContentSize().width / 2),
+                                canvas->getContentSize().height / 2
+                            ));
+
+                            pointIcon->setPosition(ccp(
+                                pointsLabel->getPositionX() + (pointsLabel->getScaledContentSize().width / 2) + (pointIcon->getScaledContentSize().width / 2) + 2.f,
+                                canvas->getContentSize().height / 2
+                            ));
+
+                            canvas->addChild(pointsLabel);
+                            canvas->addChild(pointIcon);
+
+                            auto statItem = CCMenuItemSpriteExtra::create(
+                                canvas,
+                                this,
+                                menu_selector(MyProfilePage::onOtherStreakStatClick)
+                            );
+                            statItem->setUserObject(
+                                "user-profile"_spr,
+                                StreakUserProfile::create(pData)
+                            );
+                            statItem->setID(STREAK_STAT_ID);
+
+                            statsMenu->addChild(statItem);
+                            statsMenu->updateLayout();
+                        }
                     }
-                    else {
-                        Loader::get()->queueInMainThread([this]() {
-                            this->autorelease();
-                            });
-                    }
-                }
-                else if (e->isCancelled()) {
-                    Loader::get()->queueInMainThread([this]() {
-                        this->autorelease();
-                        });
                 }
                 });
-
             auto req = web::WebRequest();
             m_fields->m_remoteDataListener.setFilter(req.get(url));
         }

@@ -1,6 +1,6 @@
 # Streak!
 
-# 1.10.27
+# 1.10.28
 - Fix Bugs
 - Update Support
 

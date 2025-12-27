@@ -50,14 +50,14 @@ private:
         auto scene = CCDirector::sharedDirector()->getRunningScene();
         if (!scene) return;
 
-        // 1. Buscamos cuál es el Z-Order más alto que existe actualmente en la escena
+      
         int highestZ = 0;
         auto children = scene->getChildren();
         if (children && children->count() > 0) {
             CCObject* obj;
             CCARRAY_FOREACH(children, obj) {
                 auto node = static_cast<CCNode*>(obj);
-                // Buscamos el Z más alto (evitamos números absurdamente grandes que puedan ser errores)
+        
                 if (node->getZOrder() > highestZ && node->getZOrder() < 10000000) {
                     highestZ = node->getZOrder();
                 }
@@ -67,7 +67,7 @@ private:
         auto node = SystemNotification::create(title, message, iconName, iconScale);
         s_activeNotification = node;
 
-        // 2. Nos colocamos encima del más alto que encontramos + 100
+     
         scene->addChild(node, highestZ + 100);
     }
 
