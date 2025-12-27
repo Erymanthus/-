@@ -471,8 +471,14 @@ protected:
             g_streakData.save();
         }
 
-        this->checkAllNotifications();
-        this->checkNewMessages();
+        Loader::get()->queueInMainThread([this] {
+            this->checkAllNotifications();
+            });
+
+      
+        Loader::get()->queueInMainThread([this] {
+            this->checkNewMessages();
+            });
 
         return true;
     }
