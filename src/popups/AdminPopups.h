@@ -755,38 +755,41 @@ protected:
                 int ticketsStart = g_streakData.starTickets;
                 int xpStart = g_streakData.currentXP;
 
-                g_streakData.superStars += (codeStars + levelStars);
-                g_streakData.starTickets += (codeTickets + levelTickets);
-                if (codeXP > 0) g_streakData.addXP(codeXP);
-
                 bool isNewBadge = false;
                 if (!badgeID.empty()) {
                     isNewBadge = !g_streakData.isBadgeUnlocked(badgeID);
-                    g_streakData.unlockBadge(badgeID);
                 }
 
                 bool isNewBanner = false;
                 if (!bannerID.empty()) {
                     isNewBanner = !g_streakData.isBannerUnlocked(bannerID);
-                    g_streakData.unlockBanner(bannerID);
                 }
+
+                g_streakData.superStars += (codeStars + levelStars);
+                g_streakData.starTickets += (codeTickets + levelTickets);
+                if (codeXP > 0) g_streakData.addXP(codeXP);
+
+                if (isNewBadge) g_streakData.unlockBadge(badgeID);
+                if (isNewBanner) g_streakData.unlockBanner(bannerID);
 
                 g_streakData.save();
 
-                auto showConsumables = [=]() {
+                auto showSideNotifications = [=]() {
                     if (codeXP > 0) {
                         RewardNotification::show("xp.png"_spr, xpStart, codeXP);
                     }
+
                     int totalStars = codeStars + levelStars;
                     if (totalStars > 0) {
                         RewardNotification::show("super_star.png"_spr, starsStart, totalStars);
                     }
+
                     int totalTickets = codeTickets + levelTickets;
                     if (totalTickets > 0) {
                         RewardNotification::show("star_tiket.png"_spr, ticketsStart, totalTickets);
                     }
 
-                    if (isNewBanner) {
+                    if (isNewBanner && !bannerID.empty()) {
                         auto info = g_streakData.getBannerInfo(bannerID);
                         if (info) {
                             BannerNotification::show(
@@ -808,28 +811,30 @@ protected:
                     )->show();
                 }
 
-                if (!badgeID.empty() && isNewBadge) {
+                if (isNewBadge && !badgeID.empty()) {
                     auto* badgeInfo = g_streakData.getBadgeInfo(badgeID);
+
                     if (badgeInfo && badgeInfo->category == StreakData::BadgeCategory::MYTHIC) {
-                        auto animLayer = MythicAnimationLayer::create(*badgeInfo, [badgeID, showConsumables]() {
+                        auto animLayer = MythicAnimationLayer::create(*badgeInfo, [badgeID, showSideNotifications]() {
                             BadgeNotification::show(badgeID);
-                            showConsumables();
+                            showSideNotifications();
                             });
                         CCDirector::sharedDirector()->getRunningScene()->addChild(animLayer, 99999);
                     }
                     else {
                         BadgeNotification::show(badgeID);
-                        showConsumables();
+                        showSideNotifications();
                     }
                 }
                 else {
-                    showConsumables();
+                    showSideNotifications();
                 }
 
                 if (m_onSuccessCallback) {
                     m_onSuccessCallback();
                 }
 
+                FMODAudioEngine::sharedEngine()->playEffect("buyItem01.ogg");
                 this->onClose(nullptr);
             }
             else {
@@ -839,7 +844,10 @@ protected:
                 ));
                 std::string err = "Invalid code.";
                 if (res->json().isOk()) {
-                    err = res->json().unwrap()["error"].as<std::string>().unwrapOr(err);
+                    auto j = res->json().unwrap();
+                    if (j.contains("error")) {
+                        err = j["error"].as<std::string>().unwrapOr(err);
+                    }
                 }
                 FLAlertLayer::create("Error", err.c_str(), "OK")->show();
             }

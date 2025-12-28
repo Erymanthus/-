@@ -283,6 +283,13 @@ protected:
             ->setAxisAlignment(AxisAlignment::Start)
             ->setAutoGrowAxis(scrollSize.height)
         );
+       
+
+        addToggleSetting(
+            "Welcome Noti",             
+            "enable_welcome_notif",  
+            "Toggle the welcome message on startup" 
+        );
 
         addToggleSetting(
             "Streak Ani",
@@ -317,7 +324,7 @@ protected:
             "Copy your unique Streak ID"
         );
 
-        addVersionSetting("Mod Version", "1.10.29");
+        addVersionSetting("Mod Version", "1.10.3");
 
         content->updateLayout();
         m_mainLayer->addChild(m_scrollLayer);

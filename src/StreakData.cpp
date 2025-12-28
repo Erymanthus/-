@@ -91,6 +91,8 @@ void StreakData::parseServerResponse(const matjson::Value& data) {
     currentXP = data["current_xp"].as<int>().unwrapOr(0);
     currentLevel = data["current_level"].as<int>().unwrapOr(1);
 
+    hasNewStreak = false;
+
     if (data.contains("rank")) {
         globalRank = data["rank"].as<int>().unwrapOr(0);
     }
@@ -288,7 +290,7 @@ void StreakData::dailyUpdate() {
         pointMission4Claimed = false;
         pointMission5Claimed = false;
         pointMission6Claimed = false;
-
+        save();
         return;
     }
 
@@ -304,6 +306,8 @@ void StreakData::dailyUpdate() {
     pointMission4Claimed = false;
     pointMission5Claimed = false;
     pointMission6Claimed = false;
+
+    save();
 }
 
 void StreakData::checkRewards() {
@@ -324,14 +328,21 @@ void StreakData::checkRewards() {
 
 void StreakData::addPoints(int count) {
     if (!isDataLoaded) return;
-
     if (count <= 0) return;
+
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastPointTime).count();
+    if (elapsed < 1000) {
+        return;
+    }
+    lastPointTime = now;
 
     dailyUpdate();
 
     int currentRequired = getRequiredPoints();
     bool alreadyReachedGoalToday = (streakPointsToday >= currentRequired);
 
+  
     streakPointsToday += count;
     totalStreakPoints += count;
 
@@ -344,8 +355,8 @@ void StreakData::addPoints(int count) {
         currentStreak++;
         hasNewStreak = true;
 
+ 
         int starsToSend = 1;
-
         if (count >= 6) starsToSend = 10;
         else if (count >= 5) starsToSend = 9;
         else if (count >= 4) starsToSend = 7;
@@ -354,9 +365,21 @@ void StreakData::addPoints(int count) {
         else starsToSend = 1;
 
         completeLevelInFirebase(starsToSend);
+
     }
     else {
-        save();
+      
+        int starsToSend = 1;
+        if (count >= 6) starsToSend = 10;
+        else if (count >= 5) starsToSend = 9;
+        else if (count >= 4) starsToSend = 7;
+        else if (count >= 3) starsToSend = 5;
+        else if (count >= 2) starsToSend = 4;
+        else starsToSend = 1;
+
+        completeLevelInFirebase(starsToSend);
+
+       
     }
 }
 

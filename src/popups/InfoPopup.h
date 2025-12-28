@@ -57,6 +57,7 @@ protected:
         updatePlayerDataInFirebase();
         this->onClose(nullptr);
     }
+  
 
     void checkAllNotifications() {
         int currentPendingLevel = 0;
@@ -576,6 +577,7 @@ protected:
         ProfileCardPopup::create(myData)->show();
     }
 
+
     void onOpenStProgress(CCObject*) {
         StProgressPopup::create()->show();
     }
@@ -656,14 +658,18 @@ protected:
         RoulettePopup::create()->show();
     }
 
+    
+
     void showStreakAnimation(int streakLevel) {
         auto winSize = CCDirector::sharedDirector()->getWinSize();
 
+       
         auto bgLayer = CCLayerColor::create({ 0, 0, 0, 0 });
         bgLayer->setTag(110);
         this->addChild(bgLayer, 1000);
         bgLayer->runAction(CCFadeTo::create(0.5f, 200));
 
+       
         auto contentLayer = CCLayer::create();
         contentLayer->setTag(111);
         contentLayer->ignoreAnchorPointForPosition(false);
@@ -672,18 +678,70 @@ protected:
         contentLayer->setContentSize(winSize);
         this->addChild(contentLayer, 1001);
 
+        
+        auto shineGlow = CCSprite::createWithSpriteFrameName("particle_171_001.png");
+        if (shineGlow) {
+            shineGlow->setPosition(winSize / 2);
+            shineGlow->setScale(0.0f);
+
+       
+            shineGlow->setColor({ 255, 255, 255 });
+            shineGlow->setOpacity(200);
+            shineGlow->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
+
+            contentLayer->addChild(shineGlow, 1);
+
+           
+            shineGlow->runAction(CCSequence::create(
+                CCDelayTime::create(0.1f),
+                CCEaseSineOut::create(CCScaleTo::create(1.0f, 7.5f)),
+                nullptr
+            ));
+
+            shineGlow->runAction(CCRepeatForever::create(CCRotateBy::create(15.0f, 360.f)));
+        }
+
+      
+        auto titleSprite = CCSprite::create("NewStreak.png"_spr);
+        if (titleSprite) {
+            titleSprite->setPosition({ winSize.width / 2, winSize.height / 2 + 110.f });
+            titleSprite->setScale(0.0f);
+            contentLayer->addChild(titleSprite, 3);
+
+         
+            titleSprite->runAction(CCSequence::create(
+                CCDelayTime::create(0.2f),
+                CCEaseBackOut::create(CCScaleTo::create(0.5f, 1.0f)),
+                nullptr
+            ));
+
+            
+            titleSprite->runAction(CCSequence::create(
+                CCDelayTime::create(1.0f),
+                CCRepeatForever::create(CCSequence::create(
+                    CCEaseSineInOut::create(CCScaleTo::create(1.5f, 1.1f)),
+                    CCEaseSineInOut::create(CCScaleTo::create(1.5f, 1.0f)),
+                    nullptr
+                )),
+                nullptr
+            ));
+        }
+
+     
         auto rachaSprite = CCSprite::create(g_streakData.getRachaSprite().c_str());
         if (rachaSprite) {
             rachaSprite->setPosition(winSize / 2);
             rachaSprite->setScale(0.0f);
             contentLayer->addChild(rachaSprite, 2);
 
+           
             rachaSprite->runAction(CCSequence::create(
                 CCDelayTime::create(0.3f),
                 CCEaseElasticOut::create(CCScaleTo::create(1.2f, 1.0f), 0.6f),
                 nullptr
             ));
 
+         
             rachaSprite->runAction(CCSequence::create(
                 CCDelayTime::create(1.5f),
                 CCRepeatForever::create(CCSequence::create(
@@ -693,15 +751,27 @@ protected:
                 )),
                 nullptr
             ));
+
+          
+            rachaSprite->runAction(CCSequence::create(
+                CCDelayTime::create(1.5f),
+                CCRepeatForever::create(CCSequence::create(
+                    CCEaseSineInOut::create(CCScaleTo::create(1.5f, 1.15f)),
+                    CCEaseSineInOut::create(CCScaleTo::create(1.5f, 1.0f)),
+                    nullptr
+                )),
+                nullptr
+            ));
         }
 
+     
         auto daysLabel = CCLabelBMFont::create(
             fmt::format("Day {}!", streakLevel).c_str(),
             "goldFont.fnt"
         );
-        daysLabel->setPosition({ winSize.width / 2, winSize.height / 2 - 100.f });
+        daysLabel->setPosition({ winSize.width / 2, winSize.height / 2 - 120.f });
         daysLabel->setScale(0.0f);
-        contentLayer->addChild(daysLabel, 2);
+        contentLayer->addChild(daysLabel, 3);
 
         daysLabel->runAction(CCSequence::create(
             CCDelayTime::create(0.8f),
@@ -709,6 +779,7 @@ protected:
             nullptr
         ));
 
+        
         FMODAudioEngine::sharedEngine()->playEffect("achievement.mp3"_spr);
 
         contentLayer->runAction(CCSequence::create(

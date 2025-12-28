@@ -3,8 +3,11 @@
 #include <Geode/ui/ScrollLayer.hpp>
 #include <Geode/ui/TextInput.hpp>
 #include <Geode/utils/web.hpp>
-#include "../StreakData.h"
 #include <Geode/binding/CCTextInputNode.hpp>
+#include "../StreakData.h"
+#include "../BadgeNotification.h"
+#include "../RewardNotification.h"
+#include "../BannerNotification.h"
 
 using namespace geode::prelude;
 
@@ -13,6 +16,8 @@ protected:
     TextInput* m_input;
     std::string m_taskID;
     std::function<void()> m_callback;
+    CCMenuItemSpriteExtra* m_sendBtn = nullptr;
+    bool m_isSending = false;
 
     bool setup(std::string taskID, std::string title) override {
         m_taskID = taskID;
@@ -20,9 +25,10 @@ protected:
 
         CCPoint center = m_size / 2;
 
-        m_input = TextInput::create(200.0f, "Paste video link here...");
+        m_input = TextInput::create(200.0f, "Paste video link here...", "chatFont.fnt");
         m_input->setPosition({ center.x, center.y + 10.0f });
         m_input->ignoreAnchorPointForPosition(false);
+        m_input->setFilter("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~:/?#[]@!$&'()*+,;=");
         m_mainLayer->addChild(m_input);
 
         auto btnSpr = ButtonSprite::create(
@@ -31,14 +37,14 @@ protected:
             "GJ_button_01.png",
             0.8f
         );
-        auto btn = CCMenuItemSpriteExtra::create(
+        m_sendBtn = CCMenuItemSpriteExtra::create(
             btnSpr,
             this,
             menu_selector(SubmitInputPopup::onSend)
         );
 
         auto menu = CCMenu::create();
-        menu->addChild(btn);
+        menu->addChild(m_sendBtn);
         menu->setPosition({ center.x, center.y - 45.0f });
         m_mainLayer->addChild(menu);
 
@@ -46,10 +52,19 @@ protected:
     }
 
     void onSend(CCObject*) {
+        if (m_isSending) return;
+
         std::string url = m_input->getString();
         if (url.length() < 5) {
             FLAlertLayer::create("Error", "Invalid Link", "OK")->show();
             return;
+        }
+
+        m_isSending = true;
+        if (m_sendBtn) {
+            m_sendBtn->setEnabled(false);
+            auto spr = ButtonSprite::create("Sending...", "goldFont.fnt", "GJ_button_01.png", 0.8f);
+            m_sendBtn->setNormalImage(spr);
         }
 
         auto am = GJAccountManager::sharedState();
@@ -72,6 +87,12 @@ protected:
                 FLAlertLayer::create("Success", "Sent for review!", "OK")->show();
             }
             else {
+                m_isSending = false;
+                if (m_sendBtn) {
+                    m_sendBtn->setEnabled(true);
+                    auto spr = ButtonSprite::create("Send", "goldFont.fnt", "GJ_button_01.png", 0.8f);
+                    m_sendBtn->setNormalImage(spr);
+                }
                 FLAlertLayer::create("Error", "Failed to send.", "OK")->show();
             }
             });
@@ -324,12 +345,28 @@ protected:
     void onClaimClick(CCObject*) {
         if (m_data.stars > 0) {
             g_streakData.addXP(m_data.stars);
+            int startStars = g_streakData.superStars;
+            g_streakData.superStars += m_data.stars;
+            RewardNotification::show("super_star.png"_spr, startStars, m_data.stars);
         }
+
         if (!m_data.badgeID.empty()) {
             g_streakData.unlockBadge(m_data.badgeID);
+            BadgeNotification::show(m_data.badgeID);
         }
+
         if (!m_data.bannerID.empty()) {
             g_streakData.unlockBanner(m_data.bannerID);
+            auto bInfo = g_streakData.getBannerInfo(m_data.bannerID);
+            if (bInfo) {
+                BannerNotification::show(
+                    m_data.bannerID,
+                    bInfo->spriteName,
+                    bInfo->displayName,
+                    g_streakData.getCategoryName(bInfo->rarity),
+                    g_streakData.getCategoryColor(bInfo->rarity)
+                );
+            }
         }
 
         g_streakData.setTaskStatus(m_data.id, "claimed");
@@ -338,7 +375,7 @@ protected:
         if (m_reloadFunc) {
             m_reloadFunc();
         }
-        FLAlertLayer::create("Rewards", "Task Claimed!", "OK")->show();
+        FMODAudioEngine::sharedEngine()->playEffect("buyItem01.ogg");
     }
 
 public:

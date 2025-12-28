@@ -15,6 +15,14 @@ protected:
     std::string m_badgeID;
     bool m_isCurrentlyEquipped;
 
+    void onCredits(CCObject*) {
+        auto badgeInfo = g_streakData.getBadgeInfo(m_badgeID);
+        if (badgeInfo) {
+            std::string text = "Created by: <cp>" + badgeInfo->creator + "</c>";
+            FLAlertLayer::create("Credits", text.c_str(), "OK")->show();
+        }
+    }
+
     bool setup(std::string badgeID) override {
         m_badgeID = badgeID;
         auto winSize = m_mainLayer->getContentSize();
@@ -71,6 +79,23 @@ protected:
             g_streakData.getCategoryColor(badgeInfo->category)
         );
         m_mainLayer->addChild(categoryLabel);
+
+        auto creditsSprite = CCSprite::create("credits_btn.png"_spr);
+        creditsSprite->setScale(0.7f);
+
+        auto creditsBtn = CCMenuItemSpriteExtra::create(
+            creditsSprite,
+            this,
+            menu_selector(EquipBadgePopup::onCredits)
+        );
+
+        auto creditsMenu = CCMenu::create();
+        creditsMenu->addChild(creditsBtn);
+        creditsMenu->setPosition({
+            winSize.width / 2 - 125.f + 30.f,
+            winSize.height / 2 - 100.f + 30.f
+            });
+        m_mainLayer->addChild(creditsMenu);
 
         if (isUnlocked) {
             auto mainBtn = CCMenuItemSpriteExtra::create(
@@ -142,6 +167,14 @@ protected:
     std::string m_bannerID;
     bool m_isCurrentlyEquipped;
 
+    void onCredits(CCObject*) {
+        auto bannerInfo = g_streakData.getBannerInfo(m_bannerID);
+        if (bannerInfo) {
+            std::string text = "Created by: <cp>" + bannerInfo->creator + "</c>";
+            FLAlertLayer::create("Credits", text.c_str(), "OK")->show();
+        }
+    }
+
     bool setup(std::string bannerID) override {
         m_bannerID = bannerID;
         auto winSize = m_mainLayer->getContentSize();
@@ -205,6 +238,23 @@ protected:
         );
         m_mainLayer->addChild(categoryLabel);
 
+        auto creditsSprite = CCSprite::create("credits_btn.png"_spr);
+        creditsSprite->setScale(0.7f);
+
+        auto creditsBtn = CCMenuItemSpriteExtra::create(
+            creditsSprite,
+            this,
+            menu_selector(EquipBannerPopup::onCredits)
+        );
+
+        auto creditsMenu = CCMenu::create();
+        creditsMenu->addChild(creditsBtn);
+        creditsMenu->setPosition({
+            winSize.width / 2 - 140.f + 30.f,
+            winSize.height / 2 - 110.f + 30.f
+            });
+        m_mainLayer->addChild(creditsMenu);
+
         if (isUnlocked) {
             auto mainBtn = CCMenuItemSpriteExtra::create(
                 ButtonSprite::create(m_isCurrentlyEquipped ? "Unequip" : "Equip"),
@@ -266,6 +316,7 @@ public:
         return nullptr;
     }
 };
+
 
 class RewardsPopup : public Popup<> {
 protected:
