@@ -1,8 +1,13 @@
 # Streak!
 
+# 1.10.29
+- Fix bugs
+
+
 # 1.10.28
 - Fix Bugs
 - Update Support
+
 
 # 1.10.2 Banners & Custom Profiles
 - New events
