@@ -19,19 +19,8 @@ protected:
 
     void onViewLevel(CCObject* sender) {
         int levelID = sender->getTag();
-        auto glm = GameLevelManager::sharedState();
-        auto level = glm->getSavedLevel(levelID);
-
-        if (!level) {
-            level = GJGameLevel::create();
-            level->m_levelID = levelID;
-            level->m_levelType = GJLevelType::Saved;
-        }
-
-        auto scene = CCScene::create();
-        auto layer = LevelInfoLayer::create(level, false);
-
-        scene->addChild(layer);
+        auto searchObject = GJSearchObject::create(SearchType::Search, std::to_string(levelID));
+        auto scene = LevelBrowserLayer::scene(searchObject);
         CCDirector::sharedDirector()->replaceScene(
             CCTransitionFade::create(0.5f, scene)
         );
@@ -45,7 +34,7 @@ protected:
             NotificationIcon::None,
             0.5f
         )->show();
-        FMODAudioEngine::sharedEngine()->playEffect("playSound_001.ogg"_spr);
+      
     }
 
     void onMissionInfo(CCObject*) {

@@ -6,13 +6,21 @@
 
 using namespace geode::prelude;
 
-class HistoryCell : public cocos2d::CCLayer {
+class HistoryCell : public cocos2d::CCNode {
 protected:
     bool init(const std::string& date, int points, float width) {
-        if (!cocos2d::CCLayer::init()) return false;
+        if (!cocos2d::CCNode::init()) return false;
 
         float height = 30.f;
         this->setContentSize({ width, height });
+        this->ignoreAnchorPointForPosition(false);
+        this->setAnchorPoint({ 0.5f, 0.5f });
+
+        auto bg = CCLayerColor::create({ 0, 0, 0, 50 }, width, height - 2);
+        bg->ignoreAnchorPointForPosition(false);
+        bg->setAnchorPoint({ 0.5f, 0.5f });
+        bg->setPosition({ width / 2, height / 2 });
+        this->addChild(bg);
 
         auto dateLabel = cocos2d::CCLabelBMFont::create(date.c_str(), "goldFont.fnt");
         dateLabel->setScale(0.5f);
@@ -27,12 +35,14 @@ protected:
         this->addChild(pointsLabel);
 
         auto pointIcon = cocos2d::CCSprite::create("streak_point.png"_spr);
-        pointIcon->setScale(0.15f);
-        pointIcon->setPosition({
-            pointsLabel->getPositionX() - pointsLabel->getScaledContentSize().width - 10.f,
-            height / 2
-            });
-        this->addChild(pointIcon);
+        if (pointIcon) {
+            pointIcon->setScale(0.15f);
+            pointIcon->setPosition({
+                pointsLabel->getPositionX() - pointsLabel->getScaledContentSize().width - 10.f,
+                height / 2
+                });
+            this->addChild(pointIcon);
+        }
 
         return true;
     }
@@ -57,19 +67,10 @@ protected:
         this->setTitle("Streak History");
         g_streakData.load();
 
-        // REEMPLAZO DEL FONDO PRINCIPAL DEL POPUP
-        if (m_bgSprite) {
-            m_bgSprite->removeFromParent();
-        }
-        m_bgSprite = CCScale9Sprite::create("geode.loader/GE_square01.png");
-        m_bgSprite->setContentSize(m_size);
-        m_bgSprite->setPosition(CCDirector::get()->getWinSize() / 2);
-        this->addChild(m_bgSprite, -1);
-
-        auto listSize = CCSize{ 220.f, 130.f };
+        auto winSize = CCDirector::sharedDirector()->getWinSize();
         auto popupCenter = m_mainLayer->getContentSize() / 2;
+        auto listSize = CCSize{ 220.f, 130.f };
 
-        // FONDO DE LA LISTA (OSCURO SEMI TRANSPARENTE)
         auto listBg = cocos2d::extension::CCScale9Sprite::create("square02_001.png");
         listBg->setContentSize(listSize);
         listBg->setColor({ 0, 0, 0 });
@@ -90,21 +91,22 @@ protected:
         auto scroll = ScrollLayer::create(listSize);
         scroll->setPosition(popupCenter - listSize / 2);
 
-        for (const auto& [date, points] : m_historyEntries) {
+        float cellHeight = 30.f;
+        float totalHeight = std::max(listSize.height, (float)m_historyEntries.size() * cellHeight);
+
+        auto contentLayer = scroll->m_contentLayer;
+        contentLayer->setContentSize({ listSize.width, totalHeight });
+
+        for (size_t i = 0; i < m_historyEntries.size(); ++i) {
+            const auto& [date, points] = m_historyEntries[i];
             auto cell = HistoryCell::create(date, points, listSize.width);
-            scroll->m_contentLayer->addChild(cell);
+
+            float yPos = totalHeight - (i * cellHeight) - (cellHeight / 2);
+            cell->setPosition({ listSize.width / 2, yPos });
+            contentLayer->addChild(cell);
         }
 
-        scroll->m_contentLayer->setLayout(
-            ColumnLayout::create()
-            ->setGap(2.f)
-            ->setAxisAlignment(AxisAlignment::End)
-            ->setAxisReverse(true)
-        );
-
-        scroll->m_contentLayer->updateLayout();
-        scroll->scrollToTop();
-
+        scroll->moveToTop();
         m_mainLayer->addChild(scroll);
 
         return true;
@@ -113,7 +115,7 @@ protected:
 public:
     static HistoryPopup* create() {
         auto ret = new HistoryPopup();
-        if (ret && ret->initAnchored(260.f, 210.f)) {
+        if (ret && ret->initAnchored(260.f, 210.f, "geode.loader/GE_square01.png")) {
             ret->autorelease();
             return ret;
         }

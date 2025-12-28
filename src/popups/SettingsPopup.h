@@ -317,7 +317,7 @@ protected:
             "Copy your unique Streak ID"
         );
 
-        addVersionSetting("Mod Version", "1.10.28");
+        addVersionSetting("Mod Version", "1.10.29");
 
         content->updateLayout();
         m_mainLayer->addChild(m_scrollLayer);
