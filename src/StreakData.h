@@ -159,11 +159,11 @@ struct StreakData {
         {0, "tlt.png"_spr, "The Living Tombstone", BadgeCategory::EPIC, "tlt_badge", true, "XJotaBeLikeX"},
 
         // shop
-        {0, "Frostbite_badge.png"_spr, "Frostbite", BadgeCategory::SPECIAL, "Frostbite_badge", true, "Fluffaroni"},
-        {0, "Skybound_badge.png"_spr, "Skybound", BadgeCategory::EPIC, "Skybound_badge", true, "Fluffaroni"},
-        {0, "Steampunk_Dash_badge.png"_spr, "Steampunk", BadgeCategory::COMMON, "Steampunk_Dash_badge", true, "Fluffaroni"},
+        {0, "Frostbite_badge.png"_spr, "Frostbite", BadgeCategory::SPECIAL, "Frostbite_badge", true, "la Fluffaroni"},
+        {0, "Skybound_badge.png"_spr, "Skybound", BadgeCategory::EPIC, "Skybound_badge", true, "la Fluffaroni"},
+        {0, "Steampunk_Dash_badge.png"_spr, "Steampunk", BadgeCategory::COMMON, "Steampunk_Dash_badge", true, "la Fluffaroni"},
         {0, "money_badge.png"_spr, "Money Money", BadgeCategory::SPECIAL, "money_badge", true, "XJotaBeLikeX"},
-        {0, "Skeletal_Shenanigans_badge.png"_spr, "Skeletal Shenanigans", BadgeCategory::LEGENDARY, "Skeletal_Shenanigans_badge", true, "Fluffaroni"},
+        {0, "Skeletal_Shenanigans_badge.png"_spr, "Skeletal Shenanigans", BadgeCategory::LEGENDARY, "Skeletal_Shenanigans_badge", true, "la Fluffaroni"},
         {0, "random_badge.png"_spr, "GD Randomizer", BadgeCategory::SPECIAL, "random_badge", true, "XJotaBeLikeX"},
         {0, "mai_badge.png"_spr, "Mai Waifu", BadgeCategory::EPIC, "mai_badge", true, "XJotaBeLikeX"},
 
@@ -209,9 +209,9 @@ struct StreakData {
             {"banner_10", "banner10.png"_spr, "peace", BadgeCategory::LEGENDARY, "XJotaBeLikeX"},
             {"banner_11", "banner11.png"_spr, "Awww", BadgeCategory::SPECIAL, "XJotaBeLikeX"},
             {"banner_12", "banner12.png"_spr, "Ok?..", BadgeCategory::COMMON, "XJotaBeLikeX"},
-            {"banner_13", "banner13.png"_spr, "I am the Bloodlust", BadgeCategory::EPIC, "Fluffaroni"},
-            {"banner_14", "banner14.png"_spr, "red prison", BadgeCategory::COMMON, "Fluffaroni"},
-            {"banner_15", "banner15.png"_spr, "I always come back", BadgeCategory::MYTHIC, "Fluffaroni"},
+            {"banner_13", "banner13.png"_spr, "I am the Bloodlust", BadgeCategory::EPIC, "la Fluffaroni"},
+            {"banner_14", "banner14.png"_spr, "red prison", BadgeCategory::COMMON, "la Fluffaroni"},
+            {"banner_15", "banner15.png"_spr, "I always come back", BadgeCategory::MYTHIC, "la Fluffaroni"},
             {"banner_16", "banner16.png"_spr, "Miku v2", BadgeCategory::SPECIAL, "XJotaBeLikeX"},
             {"banner_17", "banner17.png"_spr, "Where am I?", BadgeCategory::LEGENDARY, "XJotaBeLikeX"},
             {"banner_18", "banner18.png"_spr, "there we go", BadgeCategory::EPIC, "XJotaBeLikeX"},

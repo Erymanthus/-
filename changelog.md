@@ -1,6 +1,6 @@
 # Streak!
 
-# 1.10.3
+# 1.10.30
 - Fix bugs
 - Update Support
 - Update Streak Animation
